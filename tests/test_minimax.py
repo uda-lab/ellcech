@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 import ellphi
+import ellphi_alpha.minimax as minimax_mod
 from ellphi_alpha.minimax import solve_minimax, solve_minimax_from_coefs
 
 
@@ -282,3 +283,54 @@ class TestNumericalStabilityControls:
             solve_minimax(A, centers, condition_number_limit=1.0)
         with pytest.raises(ValueError):
             solve_minimax(A, centers, max_conditioning_steps=-1)
+
+    def test_conditioning_steps_cap_is_strict(self):
+        A = np.diag([1e-12, 1.0])
+        eye = np.eye(2)
+        limited0 = minimax_mod._condition_matrix(
+            A,
+            regularization=1e-6,
+            condition_number_limit=2.0,
+            max_conditioning_steps=0,
+        )
+        limited1 = minimax_mod._condition_matrix(
+            A,
+            regularization=1e-6,
+            condition_number_limit=2.0,
+            max_conditioning_steps=1,
+        )
+
+        np.testing.assert_allclose(limited0, A + 1e-6 * eye)
+        np.testing.assert_allclose(limited1, A + 1e-5 * eye)
+
+    def test_from_coefs_matches_direct_minimax_with_non_default_stability(self):
+        rng = np.random.default_rng(77)
+        x0, x1 = rng.standard_normal((2, 2))
+        cov0 = _make_spd(rng, 2)
+        cov1 = _make_spd(rng, 2)
+        pcoef = ellphi.coef_from_cov(x0, cov0)[0]
+        qcoef = ellphi.coef_from_cov(x1, cov1)[0]
+        coefs = np.stack([pcoef, qcoef])
+
+        from ellphi.geometry import unpack_conic
+
+        A_arr, b_arr, _ = unpack_conic(coefs)
+        centers = np.stack([-np.linalg.solve(A_arr[i], b_arr[i]) for i in range(2)])
+
+        kwargs = {
+            "regularization": 1e-6,
+            "condition_number_limit": 1e6,
+            "max_conditioning_steps": 2,
+            "tol": 1e-10,
+        }
+        direct = solve_minimax(A_arr, centers, **kwargs)
+        from_coefs = solve_minimax_from_coefs(coefs, **kwargs)
+
+        assert from_coefs.alpha == pytest.approx(direct.alpha, rel=1e-10, abs=1e-12)
+        np.testing.assert_allclose(
+            from_coefs.circumcenter,
+            direct.circumcenter,
+            rtol=1e-10,
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(from_coefs.weights, direct.weights, rtol=1e-10, atol=1e-12)

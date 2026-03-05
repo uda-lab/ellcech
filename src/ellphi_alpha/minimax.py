@@ -116,12 +116,17 @@ def _condition_matrix(
     reg = max(regularization, eps_floor)
     A_reg = A + reg * eye
 
-    for _ in range(max_conditioning_steps + 1):
+    cond = np.linalg.cond(A_reg)
+    if np.isfinite(cond) and cond <= condition_number_limit:
+        return A_reg
+
+    # Strict cap: perform at most max_conditioning_steps escalations.
+    for _ in range(max_conditioning_steps):
+        reg *= 10.0
+        A_reg = A + reg * eye
         cond = np.linalg.cond(A_reg)
         if np.isfinite(cond) and cond <= condition_number_limit:
             return A_reg
-        reg *= 10.0
-        A_reg = A + reg * eye
     return A_reg
 
 
@@ -145,6 +150,18 @@ def _cholesky_solve(
         return linalg.cho_solve(chol, b, check_finite=False)
     except linalg.LinAlgError:
         return np.linalg.lstsq(A, b, rcond=None)[0]
+
+
+def _exact_linear_solve(A: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Solve A x = b without stability regularization adjustments."""
+    try:
+        chol = linalg.cho_factor(A, check_finite=False)
+        return linalg.cho_solve(chol, b, check_finite=False)
+    except linalg.LinAlgError:
+        try:
+            return np.linalg.solve(A, b)
+        except np.linalg.LinAlgError:
+            return np.linalg.lstsq(A, b, rcond=None)[0]
 
 
 def _eval_f(
@@ -389,6 +406,7 @@ def solve_minimax_from_coefs(
         coefs: Packed conic coefficient array, shape (k, m) or (m,) for k=1.
         **kwargs: Forwarded to solve_minimax (tol, max_iter, weight_tol,
             regularization, condition_number_limit, max_conditioning_steps).
+            These controls affect minimax iterations only, not center recovery.
 
     Returns:
         MinimaxResult.
@@ -404,16 +422,7 @@ def solve_minimax_from_coefs(
     # x_bar_i = -A_i^{-1} b_i  (ellphi sign convention: b = -A x_bar)
     k = A_arr.shape[0]
     centers = np.empty_like(b_arr)
-    regularization = float(kwargs.get("regularization", 0.0))
-    condition_number_limit = kwargs.get("condition_number_limit")
-    max_conditioning_steps = int(kwargs.get("max_conditioning_steps", _DEFAULT_MAX_COND_STEPS))
     for i in range(k):
-        centers[i] = _cholesky_solve(
-            A_arr[i],
-            -b_arr[i],
-            regularization=regularization,
-            condition_number_limit=condition_number_limit,
-            max_conditioning_steps=max_conditioning_steps,
-        )
+        centers[i] = _exact_linear_solve(A_arr[i], -b_arr[i])
 
     return solve_minimax(A_arr, centers, **kwargs)
