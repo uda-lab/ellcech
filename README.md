@@ -72,6 +72,19 @@ print(f"α(triangle) = {res3.alpha:.6f},  active set = {res3.active_set}")
 poetry run pytest
 ```
 
+## Filtration Cache (Optional)
+
+For repeated builds on the same dataset/settings, you can reuse predicate/minimax
+results with a plain dictionary cache:
+
+```python
+cache = {}
+filt1 = ea.build_incremental_filtration(A, centers, max_dim=2, predicate_cache=cache)
+filt2 = ea.build_incremental_filtration(A, centers, max_dim=2, predicate_cache=cache)
+```
+
+Cache keys include simplex, `minimax_kwargs`, `boundary_tol`, and `empty_tol`.
+
 ## Phase-4 Acceptance Measurements
 
 ```bash

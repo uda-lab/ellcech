@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Mapping, NamedTuple
+from collections.abc import Hashable, MutableMapping
+from typing import Mapping, NamedTuple, TypeAlias
 
 import numpy as np
 
@@ -11,7 +12,15 @@ from .predicates import PredicateResult, evaluate_predicates
 
 __all__ = [
     "FiltrationEntry",
+    "PredicateCacheKey",
     "build_incremental_filtration",
+]
+
+PredicateCacheKey: TypeAlias = tuple[
+    tuple[int, ...],  # simplex
+    tuple[tuple[str, Hashable], ...],  # normalized minimax kwargs
+    float,  # boundary_tol
+    float,  # empty_tol
 ]
 
 
@@ -29,6 +38,40 @@ def _codim_one_faces(simplex: tuple[int, ...]) -> list[tuple[int, ...]]:
     return [simplex[:i] + simplex[i + 1 :] for i in range(len(simplex))]
 
 
+def _freeze_cache_value(value: object) -> Hashable:
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, (str, bytes, int, float, bool, type(None))):
+        return value
+    if isinstance(value, tuple):
+        return tuple(_freeze_cache_value(v) for v in value)
+    if isinstance(value, list):
+        return tuple(_freeze_cache_value(v) for v in value)
+    if isinstance(value, set):
+        return tuple(sorted(_freeze_cache_value(v) for v in value))
+    if isinstance(value, dict):
+        return tuple(sorted((str(k), _freeze_cache_value(v)) for k, v in value.items()))
+    if isinstance(value, np.ndarray):
+        return ("ndarray", tuple(value.shape), str(value.dtype), value.tobytes())
+    return repr(value)
+
+
+def _predicate_cache_key(
+    simplex: tuple[int, ...],
+    *,
+    minimax_kwargs: Mapping[str, object] | None,
+    boundary_tol: float,
+    empty_tol: float,
+) -> PredicateCacheKey:
+    frozen_kwargs = tuple(
+        sorted(
+            (str(k), _freeze_cache_value(v))
+            for k, v in (minimax_kwargs or {}).items()
+        )
+    )
+    return (simplex, frozen_kwargs, float(boundary_tol), float(empty_tol))
+
+
 def build_incremental_filtration(
     matrices: np.ndarray,
     centers: np.ndarray,
@@ -37,6 +80,7 @@ def build_incremental_filtration(
     minimax_kwargs: Mapping[str, object] | None = None,
     boundary_tol: float = 1e-7,
     empty_tol: float = 1e-7,
+    predicate_cache: MutableMapping[PredicateCacheKey, PredicateResult] | None = None,
 ) -> list[FiltrationEntry]:
     """Build filtration entries using candidate enumeration + P1-P3 checks.
 
@@ -44,6 +88,12 @@ def build_incremental_filtration(
     1. Downward closure: each inserted simplex has all codimension-1 faces present.
     2. Monotone alpha values along face inclusions.
     3. Output sorted by (alpha, simplex dimension, lexicographic simplex).
+
+    Optional caching:
+    - Provide ``predicate_cache`` (typically a dict) to reuse predicate/minimax
+      results across repeated builds on the same dataset and settings.
+    - Cache keys include simplex, ``minimax_kwargs``, ``boundary_tol``, and
+      ``empty_tol``.
     """
     matrices = np.asarray(matrices, dtype=float)
     centers = np.asarray(centers, dtype=float)
@@ -77,14 +127,29 @@ def build_incremental_filtration(
             # expensive predicate/minimax evaluation for this simplex.
             continue
 
-        pred = evaluate_predicates(
-            simplex,
-            matrices,
-            centers,
-            minimax_kwargs=minimax_kwargs,
-            boundary_tol=boundary_tol,
-            empty_tol=empty_tol,
-        )
+        cache_key = None
+        pred = None
+        if predicate_cache is not None:
+            cache_key = _predicate_cache_key(
+                simplex,
+                minimax_kwargs=minimax_kwargs,
+                boundary_tol=boundary_tol,
+                empty_tol=empty_tol,
+            )
+            pred = predicate_cache.get(cache_key)
+
+        if pred is None:
+            pred = evaluate_predicates(
+                simplex,
+                matrices,
+                centers,
+                minimax_kwargs=minimax_kwargs,
+                boundary_tol=boundary_tol,
+                empty_tol=empty_tol,
+            )
+            if predicate_cache is not None and cache_key is not None:
+                predicate_cache[cache_key] = pred
+
         if not pred.accepted:
             continue
 

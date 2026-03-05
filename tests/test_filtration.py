@@ -120,3 +120,82 @@ def test_build_incremental_filtration_faces_first_prune_skips_eval(monkeypatch):
     assert (1, 2, 3) in calls
 
     assert (0, 1) not in simplices
+
+
+def test_build_incremental_filtration_predicate_cache_reuses_results(monkeypatch):
+    pts = np.array(
+        [
+            [0.0, 0.0],
+            [2.0, 0.0],
+            [1.0, np.sqrt(3.0)],
+        ]
+    )
+    matrices = np.repeat(np.eye(2)[np.newaxis], 3, axis=0)
+    calls: list[tuple[int, ...]] = []
+
+    def fake_evaluate_predicates(simplex, *_args, **_kwargs):
+        simplex_t = tuple(simplex)
+        calls.append(simplex_t)
+        return _fake_predicate(simplex_t, accepted=True, alpha=float(len(simplex_t)), dim=2)
+
+    monkeypatch.setattr(filtration_mod, "evaluate_predicates", fake_evaluate_predicates)
+
+    cache = {}
+    first = filtration_mod.build_incremental_filtration(
+        matrices,
+        pts,
+        max_dim=2,
+        predicate_cache=cache,
+    )
+    n_calls_first = len(calls)
+    assert n_calls_first == 4  # 3 edges + 1 triangle
+    assert len(cache) == 4
+
+    second = filtration_mod.build_incremental_filtration(
+        matrices,
+        pts,
+        max_dim=2,
+        predicate_cache=cache,
+    )
+    n_calls_second = len(calls) - n_calls_first
+    assert n_calls_second == 0
+    assert [entry.simplex for entry in second] == [entry.simplex for entry in first]
+    assert [entry.alpha for entry in second] == [entry.alpha for entry in first]
+
+
+def test_build_incremental_filtration_predicate_cache_respects_settings(monkeypatch):
+    pts = np.array(
+        [
+            [0.0, 0.0],
+            [2.0, 0.0],
+            [1.0, np.sqrt(3.0)],
+        ]
+    )
+    matrices = np.repeat(np.eye(2)[np.newaxis], 3, axis=0)
+    calls: list[tuple[int, ...]] = []
+
+    def fake_evaluate_predicates(simplex, *_args, **_kwargs):
+        simplex_t = tuple(simplex)
+        calls.append(simplex_t)
+        return _fake_predicate(simplex_t, accepted=True, alpha=float(len(simplex_t)), dim=2)
+
+    monkeypatch.setattr(filtration_mod, "evaluate_predicates", fake_evaluate_predicates)
+
+    cache = {}
+    filtration_mod.build_incremental_filtration(
+        matrices,
+        pts,
+        max_dim=2,
+        boundary_tol=1e-7,
+        predicate_cache=cache,
+    )
+    n_calls_after_first = len(calls)
+    filtration_mod.build_incremental_filtration(
+        matrices,
+        pts,
+        max_dim=2,
+        boundary_tol=1e-6,  # different setting: should miss cache
+        predicate_cache=cache,
+    )
+    n_calls_after_second = len(calls)
+    assert n_calls_after_second - n_calls_after_first == 4
