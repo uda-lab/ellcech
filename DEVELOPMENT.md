@@ -34,6 +34,18 @@
 - If `gudhi` is not installed, A/B are marked `skipped` (not failed) and the
   conditioning benchmark still runs.
 
+### Measured outcomes (with GUDHI available)
+
+Run date: 2026-03-06 (`scripts/run_phase4_acceptance.py`).
+
+- **A) Baseline `d=2, n=100` barcode agreement vs GUDHI**:
+  `status=ok`, `passed=True`, `h0_count_ours=100`, `h0_count_gudhi=100`,
+  `h0_bottleneck=1.942890293094024e-16`,
+  `max_abs_edge_alpha_diff=1.942890293094024e-16`.
+- **B) 6-rings long-lived H1 check**:
+  `status=ok`, `passed=True`, `h1_count=14`, `long_lived_h1_count=8`
+  (threshold: `>= 6` at lifetime `>= 0.25`).
+
 ## Session 2026-03-06 — Gaps B-F
 
 ### What was built
