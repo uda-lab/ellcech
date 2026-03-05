@@ -14,6 +14,7 @@ from .filtration import FiltrationEntry, build_incremental_filtration
 from .gudhi_bridge import to_gudhi_simplex_tree
 
 DEFAULT_BASELINE_SEED = 20260306
+DEFAULT_SIX_RINGS_SEED = 20260307
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,27 @@ class BaselineBarcodeAgreement:
     h0_count_gudhi: int | None
     h0_bottleneck: float | None
     max_abs_edge_alpha_diff: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class SixRingsH1Check:
+    """Result bundle for the 6-rings long-lived H1 check."""
+
+    status: str
+    message: str
+    passed: bool | None
+    rings: int
+    points_per_ring: int
+    n_points: int
+    random_seed: int
+    h1_count: int | None
+    long_lived_h1_count: int | None
+    min_long_lived_h1: int
+    lifetime_threshold: float
+    top_h1_lifetimes: list[float] | None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -67,6 +89,48 @@ def _h0_intervals(simplex_tree) -> np.ndarray:
     simplex_tree.persistence(homology_coeff_field=2)
     intervals = simplex_tree.persistence_intervals_in_dimension(0)
     return np.asarray(intervals, dtype=float)
+
+
+def _make_six_rings_points(
+    *,
+    points_per_ring: int,
+    ring_radius: float,
+    spacing: float,
+    noise: float,
+    random_seed: int,
+) -> np.ndarray:
+    if points_per_ring < 8:
+        raise ValueError("points_per_ring must be >= 8")
+    if ring_radius <= 0:
+        raise ValueError("ring_radius must be positive")
+    if spacing <= 0:
+        raise ValueError("spacing must be positive")
+    if noise < 0:
+        raise ValueError("noise must be non-negative")
+
+    rng = np.random.default_rng(random_seed)
+    centers = np.array(
+        [
+            [-spacing, -spacing / 2.0],
+            [0.0, -spacing / 2.0],
+            [spacing, -spacing / 2.0],
+            [-spacing, spacing / 2.0],
+            [0.0, spacing / 2.0],
+            [spacing, spacing / 2.0],
+        ],
+        dtype=float,
+    )
+
+    points: list[np.ndarray] = []
+    base_angles = np.linspace(0.0, 2.0 * np.pi, points_per_ring, endpoint=False)
+    for c in centers:
+        angle_offset = rng.uniform(0.0, 2.0 * np.pi)
+        angles = base_angles + angle_offset
+        ring = np.column_stack([np.cos(angles), np.sin(angles)]) * ring_radius
+        if noise > 0:
+            ring = ring + rng.normal(scale=noise, size=ring.shape)
+        points.append(ring + c)
+    return np.vstack(points)
 
 
 def run_baseline_barcode_agreement(
@@ -152,6 +216,78 @@ def run_baseline_barcode_agreement(
         h0_count_gudhi=int(len(gudhi_h0)),
         h0_bottleneck=h0_bottleneck,
         max_abs_edge_alpha_diff=float(max_abs_edge_alpha_diff),
+    )
+
+
+def run_six_rings_h1_check(
+    *,
+    points_per_ring: int = 24,
+    ring_radius: float = 1.0,
+    spacing: float = 6.0,
+    noise: float = 0.03,
+    random_seed: int = DEFAULT_SIX_RINGS_SEED,
+    lifetime_threshold: float = 0.25,
+    min_long_lived_h1: int = 6,
+) -> SixRingsH1Check:
+    """Check that a 6-rings dataset exposes at least 6 long-lived H1 classes."""
+    points = _make_six_rings_points(
+        points_per_ring=points_per_ring,
+        ring_radius=ring_radius,
+        spacing=spacing,
+        noise=noise,
+        random_seed=random_seed,
+    )
+
+    if not has_gudhi():
+        return SixRingsH1Check(
+            status="skipped",
+            message="gudhi is not installed; 6-rings H1 check skipped.",
+            passed=None,
+            rings=6,
+            points_per_ring=points_per_ring,
+            n_points=int(points.shape[0]),
+            random_seed=random_seed,
+            h1_count=None,
+            long_lived_h1_count=None,
+            min_long_lived_h1=min_long_lived_h1,
+            lifetime_threshold=lifetime_threshold,
+            top_h1_lifetimes=None,
+        )
+
+    import gudhi
+
+    simplex_tree = gudhi.AlphaComplex(points=points).create_simplex_tree()
+    simplex_tree.persistence(homology_coeff_field=2)
+    h1 = np.asarray(simplex_tree.persistence_intervals_in_dimension(1), dtype=float)
+    if h1.size == 0:
+        lifetimes = np.array([], dtype=float)
+    else:
+        finite_mask = np.isfinite(h1[:, 1])
+        finite_h1 = h1[finite_mask]
+        lifetimes = finite_h1[:, 1] - finite_h1[:, 0]
+
+    sorted_lifetimes = np.sort(lifetimes)[::-1]
+    long_lived_count = int(np.sum(sorted_lifetimes >= lifetime_threshold))
+    passed = long_lived_count >= min_long_lived_h1
+    message = (
+        "6-rings H1 long-lived check passed."
+        if passed
+        else "6-rings H1 long-lived check failed threshold."
+    )
+
+    return SixRingsH1Check(
+        status="ok" if passed else "failed",
+        message=message,
+        passed=passed,
+        rings=6,
+        points_per_ring=points_per_ring,
+        n_points=int(points.shape[0]),
+        random_seed=random_seed,
+        h1_count=int(len(h1)),
+        long_lived_h1_count=long_lived_count,
+        min_long_lived_h1=min_long_lived_h1,
+        lifetime_threshold=lifetime_threshold,
+        top_h1_lifetimes=[float(v) for v in sorted_lifetimes[:10]],
     )
 
 
