@@ -205,3 +205,80 @@ class TestHigherOrder:
         assert res.converged, f"k={k}, d={d}: did not converge in {res.n_iter} iters"
         assert res.alpha >= 0.0
         assert len(res.active_set) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Numerical stability controls (Gap F)
+# ---------------------------------------------------------------------------
+
+class TestNumericalStabilityControls:
+    def test_explicit_default_controls_match_previous_behaviour(self):
+        rng = np.random.default_rng(321)
+        centers = rng.standard_normal((4, 3))
+        matrices = np.stack([_make_spd(rng, 3) for _ in range(4)])
+
+        baseline = solve_minimax(matrices, centers, tol=1e-10)
+        with_explicit_defaults = solve_minimax(
+            matrices,
+            centers,
+            tol=1e-10,
+            regularization=0.0,
+            condition_number_limit=None,
+            max_conditioning_steps=8,
+        )
+
+        assert with_explicit_defaults.alpha == pytest.approx(
+            baseline.alpha, rel=1e-12, abs=1e-12
+        )
+        np.testing.assert_allclose(
+            with_explicit_defaults.circumcenter,
+            baseline.circumcenter,
+            atol=1e-12,
+            rtol=1e-12,
+        )
+        np.testing.assert_allclose(
+            with_explicit_defaults.weights,
+            baseline.weights,
+            atol=1e-12,
+            rtol=1e-12,
+        )
+
+    def test_regularization_and_conditioning_produce_finite_solution(self):
+        matrices = np.array(
+            [
+                [[1e-12, 0.0], [0.0, 1.0]],
+                [[1e12, 0.0], [0.0, 1.0]],
+                [[1.0, 0.0], [0.0, 1e-12]],
+            ]
+        )
+        centers = np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.5, 1.0],
+            ]
+        )
+
+        res = solve_minimax(
+            matrices,
+            centers,
+            regularization=1e-8,
+            condition_number_limit=1e8,
+            max_conditioning_steps=4,
+            tol=1e-9,
+            max_iter=4000,
+        )
+        assert np.isfinite(res.alpha)
+        assert np.all(np.isfinite(res.circumcenter))
+        assert np.all(np.isfinite(res.weights))
+        assert np.sum(res.weights) == pytest.approx(1.0, abs=1e-8)
+
+    def test_stability_control_parameter_validation(self):
+        A = np.eye(2)[np.newaxis].repeat(2, axis=0)
+        centers = np.array([[0.0, 0.0], [1.0, 0.0]])
+        with pytest.raises(ValueError):
+            solve_minimax(A, centers, regularization=-1.0)
+        with pytest.raises(ValueError):
+            solve_minimax(A, centers, condition_number_limit=1.0)
+        with pytest.raises(ValueError):
+            solve_minimax(A, centers, max_conditioning_steps=-1)

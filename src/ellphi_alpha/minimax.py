@@ -64,6 +64,7 @@ __all__ = [
 _DEFAULT_TOL = 1e-9
 _DEFAULT_MAX_ITER = 2000
 _DEFAULT_WEIGHT_TOL = 1e-10
+_DEFAULT_MAX_COND_STEPS = 8
 _N_BISECT = 52  # ~machine precision for double
 
 
@@ -88,8 +89,57 @@ class MinimaxResult(NamedTuple):
     n_iter: int
 
 
-def _cholesky_solve(A: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Solve A x = b via Cholesky; fall back to least-squares if singular."""
+def _condition_matrix(
+    A: np.ndarray,
+    *,
+    regularization: float,
+    condition_number_limit: float | None,
+    max_conditioning_steps: int,
+) -> np.ndarray:
+    """Optionally regularise A to improve conditioning."""
+    if regularization < 0.0:
+        raise ValueError("regularization must be non-negative")
+    if condition_number_limit is not None and condition_number_limit <= 1.0:
+        raise ValueError("condition_number_limit must be > 1 when provided")
+    if max_conditioning_steps < 0:
+        raise ValueError("max_conditioning_steps must be non-negative")
+
+    if regularization == 0.0 and condition_number_limit is None:
+        return A
+
+    eye = np.eye(A.shape[0], dtype=A.dtype)
+    if condition_number_limit is None:
+        return A + regularization * eye
+
+    spectral_scale = float(np.linalg.norm(A, ord=2))
+    eps_floor = np.finfo(A.dtype).eps * max(1.0, spectral_scale)
+    reg = max(regularization, eps_floor)
+    A_reg = A + reg * eye
+
+    for _ in range(max_conditioning_steps + 1):
+        cond = np.linalg.cond(A_reg)
+        if np.isfinite(cond) and cond <= condition_number_limit:
+            return A_reg
+        reg *= 10.0
+        A_reg = A + reg * eye
+    return A_reg
+
+
+def _cholesky_solve(
+    A: np.ndarray,
+    b: np.ndarray,
+    *,
+    regularization: float = 0.0,
+    condition_number_limit: float | None = None,
+    max_conditioning_steps: int = _DEFAULT_MAX_COND_STEPS,
+) -> np.ndarray:
+    """Solve A x = b with optional conditioning safeguards."""
+    A = _condition_matrix(
+        A,
+        regularization=regularization,
+        condition_number_limit=condition_number_limit,
+        max_conditioning_steps=max_conditioning_steps,
+    )
     try:
         chol = linalg.cho_factor(A, check_finite=False)
         return linalg.cho_solve(chol, b, check_finite=False)
@@ -97,11 +147,26 @@ def _cholesky_solve(A: np.ndarray, b: np.ndarray) -> np.ndarray:
         return np.linalg.lstsq(A, b, rcond=None)[0]
 
 
-def _eval_f(mu: np.ndarray, matrices: np.ndarray, Ax: np.ndarray, centers: np.ndarray):
+def _eval_f(
+    mu: np.ndarray,
+    matrices: np.ndarray,
+    Ax: np.ndarray,
+    centers: np.ndarray,
+    *,
+    regularization: float,
+    condition_number_limit: float | None,
+    max_conditioning_steps: int,
+):
     """Compute circumcenter x*(mu) and f_i(x*(mu)) for all i."""
     A_mu = np.einsum("k,kij->ij", mu, matrices)
     b_mu = np.einsum("k,ki->i", mu, Ax)
-    xstar = _cholesky_solve(A_mu, b_mu)
+    xstar = _cholesky_solve(
+        A_mu,
+        b_mu,
+        regularization=regularization,
+        condition_number_limit=condition_number_limit,
+        max_conditioning_steps=max_conditioning_steps,
+    )
     diff = xstar[np.newaxis, :] - centers
     f = np.einsum("ki,kij,kj->k", diff, matrices, diff)
     return xstar, f
@@ -115,6 +180,10 @@ def _exact_line_search(
     Ax: np.ndarray,
     centers: np.ndarray,
     gamma_max: float,
+    *,
+    regularization: float,
+    condition_number_limit: float | None,
+    max_conditioning_steps: int,
 ) -> float:
     """Find gamma* in [0, gamma_max] that maximises g along the pairwise direction.
 
@@ -128,7 +197,15 @@ def _exact_line_search(
         mu_g = mu.copy()
         mu_g[s] += gamma
         mu_g[v] -= gamma
-        _, f_g = _eval_f(mu_g, matrices, Ax, centers)
+        _, f_g = _eval_f(
+            mu_g,
+            matrices,
+            Ax,
+            centers,
+            regularization=regularization,
+            condition_number_limit=condition_number_limit,
+            max_conditioning_steps=max_conditioning_steps,
+        )
         return float(f_g[s] - f_g[v])
 
     h0 = h(0.0)
@@ -156,6 +233,9 @@ def solve_minimax(
     tol: float = _DEFAULT_TOL,
     max_iter: int = _DEFAULT_MAX_ITER,
     weight_tol: float = _DEFAULT_WEIGHT_TOL,
+    regularization: float = 0.0,
+    condition_number_limit: float | None = None,
+    max_conditioning_steps: int = _DEFAULT_MAX_COND_STEPS,
 ) -> MinimaxResult:
     """Compute filtration value alpha(sigma) via pairwise Frank-Wolfe on dual g(mu).
 
@@ -169,12 +249,24 @@ def solve_minimax(
              gap = f_s(x*) - sum_i mu_i f_i(x*)  >= 0.
         max_iter: Maximum number of pairwise Frank-Wolfe iterations.
         weight_tol: Threshold below which mu_i is treated as zero.
+        regularization: Optional Tikhonov regularization added to A(mu).
+            Default ``0.0`` keeps previous behaviour.
+        condition_number_limit: Optional threshold for conditioning A(mu).
+            If provided, adaptive diagonal regularization is applied.
+        max_conditioning_steps: Maximum number of adaptive regularization
+            escalations when conditioning is enabled.
 
     Returns:
         MinimaxResult.
     """
     matrices = np.asarray(matrices, dtype=float)
     centers = np.asarray(centers, dtype=float)
+    if regularization < 0.0:
+        raise ValueError("regularization must be non-negative")
+    if condition_number_limit is not None and condition_number_limit <= 1.0:
+        raise ValueError("condition_number_limit must be > 1 when provided")
+    if max_conditioning_steps < 0:
+        raise ValueError("max_conditioning_steps must be non-negative")
 
     # Accept single-simplex input (2D matrix, 1D center)
     if matrices.ndim == 2:
@@ -204,7 +296,15 @@ def solve_minimax(
     n_iter = 0
 
     for n_iter in range(1, max_iter + 1):
-        xstar, f = _eval_f(mu, matrices, Ax, centers)
+        xstar, f = _eval_f(
+            mu,
+            matrices,
+            Ax,
+            centers,
+            regularization=regularization,
+            condition_number_limit=condition_number_limit,
+            max_conditioning_steps=max_conditioning_steps,
+        )
 
         # FW vertex (most violated) and away vertex (least violated in active set)
         s = int(np.argmax(f))
@@ -226,7 +326,18 @@ def solve_minimax(
 
         # Pairwise step: d = e_s - e_v, gamma in [0, mu_v]
         gamma_max = float(mu[v])
-        gamma = _exact_line_search(s, v, mu, matrices, Ax, centers, gamma_max)
+        gamma = _exact_line_search(
+            s,
+            v,
+            mu,
+            matrices,
+            Ax,
+            centers,
+            gamma_max,
+            regularization=regularization,
+            condition_number_limit=condition_number_limit,
+            max_conditioning_steps=max_conditioning_steps,
+        )
 
         mu = mu.copy()
         mu[s] += gamma
@@ -236,7 +347,15 @@ def solve_minimax(
         mu /= mu.sum()
 
     # Final evaluation
-    xstar, f = _eval_f(mu, matrices, Ax, centers)
+    xstar, f = _eval_f(
+        mu,
+        matrices,
+        Ax,
+        centers,
+        regularization=regularization,
+        condition_number_limit=condition_number_limit,
+        max_conditioning_steps=max_conditioning_steps,
+    )
     alpha = float(np.max(f))
     active_set = [i for i in range(k) if mu[i] > weight_tol]
 
@@ -268,7 +387,8 @@ def solve_minimax_from_coefs(
 
     Args:
         coefs: Packed conic coefficient array, shape (k, m) or (m,) for k=1.
-        **kwargs: Forwarded to solve_minimax (tol, max_iter, weight_tol).
+        **kwargs: Forwarded to solve_minimax (tol, max_iter, weight_tol,
+            regularization, condition_number_limit, max_conditioning_steps).
 
     Returns:
         MinimaxResult.
@@ -284,7 +404,16 @@ def solve_minimax_from_coefs(
     # x_bar_i = -A_i^{-1} b_i  (ellphi sign convention: b = -A x_bar)
     k = A_arr.shape[0]
     centers = np.empty_like(b_arr)
+    regularization = float(kwargs.get("regularization", 0.0))
+    condition_number_limit = kwargs.get("condition_number_limit")
+    max_conditioning_steps = int(kwargs.get("max_conditioning_steps", _DEFAULT_MAX_COND_STEPS))
     for i in range(k):
-        centers[i] = _cholesky_solve(A_arr[i], -b_arr[i])
+        centers[i] = _cholesky_solve(
+            A_arr[i],
+            -b_arr[i],
+            regularization=regularization,
+            condition_number_limit=condition_number_limit,
+            max_conditioning_steps=max_conditioning_steps,
+        )
 
     return solve_minimax(A_arr, centers, **kwargs)
