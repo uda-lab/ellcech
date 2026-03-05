@@ -11,3 +11,4 @@ build/
 htmlcov/
 *.ipynb_checkpoints/
 .DS_Store
+artifacts/phase4_acceptance/
