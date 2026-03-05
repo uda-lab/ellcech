@@ -2,7 +2,7 @@ import importlib
 
 import pytest
 
-import ellphi_alpha.gudhi_bridge as gb
+import ellphi_alpha.backends.gudhi as gudhi_backend_mod
 from ellphi_alpha.filtration import FiltrationEntry
 from ellphi_alpha.gudhi_bridge import to_gudhi_simplex_tree
 
@@ -15,7 +15,7 @@ def test_to_gudhi_simplex_tree_missing_gudhi(monkeypatch):
             raise ModuleNotFoundError("No module named 'gudhi'")
         return original_import_module(name, *args, **kwargs)
 
-    monkeypatch.setattr(gb.importlib, "import_module", fake_import_module)
+    monkeypatch.setattr(gudhi_backend_mod.importlib, "import_module", fake_import_module)
     with pytest.raises(RuntimeError, match="gudhi is not installed"):
         to_gudhi_simplex_tree([((0,), 0.0)])
 
@@ -43,7 +43,7 @@ def test_to_gudhi_simplex_tree_inserts_entries(monkeypatch):
             return FakeGudhiModule
         return original_import_module(name, *args, **kwargs)
 
-    monkeypatch.setattr(gb.importlib, "import_module", fake_import_module)
+    monkeypatch.setattr(gudhi_backend_mod.importlib, "import_module", fake_import_module)
 
     filtration = [
         FiltrationEntry(simplex=(0,), alpha=0.0, predicates=None),

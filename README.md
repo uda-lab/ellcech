@@ -72,6 +72,14 @@ print(f"α(triangle) = {res3.alpha:.6f},  active set = {res3.active_set}")
 poetry run pytest
 ```
 
+## Backend architecture
+
+- Core solver, predicates, and filtration construction are backend-agnostic.
+- Optional persistence adapters live under `ellphi_alpha.backends/`.
+- `ellphi_alpha.backends.GudhiBackend` provides the GUDHI integration path.
+- `to_gudhi_simplex_tree(...)` is kept as a public compatibility wrapper over
+  the GUDHI adapter.
+
 ## Filtration Cache (Optional)
 
 For repeated builds on the same dataset/settings, you can reuse predicate/minimax
@@ -100,6 +108,10 @@ The runner writes:
 
 If `gudhi` is unavailable, the first two checks are reported as `skipped` while
 the conditioning benchmark still runs.
+
+Both `run_baseline_barcode_agreement(...)` and `run_six_rings_h1_check(...)`
+accept an optional `backend=` argument; by default they use `GudhiBackend` to
+preserve existing behavior.
 
 ## Mathematical references
 

@@ -1,5 +1,20 @@
 # Development Log
 
+## Session 2026-03-06 — Backend-Decoupling Refactor
+
+### What changed
+
+- Added backend-neutral core contracts/utilities in `src/ellphi_alpha/core/`:
+  - `backend_contracts.py` (`PersistenceBackend` protocol)
+  - `filtration_normalization.py` (canonical filtration entry normalization)
+- Added optional GUDHI adapter at `src/ellphi_alpha/backends/gudhi.py`.
+- Kept public `to_gudhi_simplex_tree(...)` in `gudhi_bridge.py` as a
+  compatibility wrapper over the adapter.
+- Refactored Phase-4 acceptance checks to accept `backend=` injection while
+  defaulting to `GudhiBackend` for behavior compatibility.
+- Extended result schemas with neutral `reference_*` fields while preserving
+  existing GUDHI-named serialized fields.
+
 ## Session 2026-03-06 — Phase-4 Acceptance Measurements
 
 ### What was built
