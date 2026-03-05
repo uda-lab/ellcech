@@ -1,10 +1,33 @@
 import numpy as np
 
+import ellphi_alpha.filtration as filtration_mod
 from ellphi_alpha.filtration import build_incremental_filtration
+from ellphi_alpha.minimax import MinimaxResult
+from ellphi_alpha.predicates import PredicateResult
 
 
 def _as_set(entries):
     return {entry.simplex for entry in entries}
+
+
+def _fake_predicate(simplex, *, accepted: bool, alpha: float, dim: int) -> PredicateResult:
+    k = len(simplex)
+    minimax = MinimaxResult(
+        alpha=float(alpha),
+        circumcenter=np.zeros(dim),
+        weights=np.full(k, 1.0 / k),
+        active_set=list(range(k)),
+        converged=True,
+        n_iter=1,
+    )
+    return PredicateResult(
+        simplex=tuple(simplex),
+        minimax=minimax,
+        p1_converged=True,
+        p2_boundary=True,
+        p3_empty=True,
+        accepted=accepted,
+    )
 
 
 def test_build_incremental_filtration_triangle_downward_closed():
@@ -63,3 +86,37 @@ def test_build_incremental_filtration_max_dim_one():
     matrices = np.repeat(np.eye(3)[np.newaxis], 6, axis=0)
     filt = build_incremental_filtration(matrices, pts, max_dim=1)
     assert all(len(entry.simplex) <= 2 for entry in filt)
+
+
+def test_build_incremental_filtration_faces_first_prune_skips_eval(monkeypatch):
+    pts = np.array(
+        [
+            [0.0, 0.0],
+            [2.0, 0.0],
+            [0.0, 2.0],
+            [2.0, 2.0],
+        ]
+    )
+    matrices = np.repeat(np.eye(2)[np.newaxis], 4, axis=0)
+    calls: list[tuple[int, ...]] = []
+
+    def fake_evaluate_predicates(simplex, *_args, **_kwargs):
+        simplex_t = tuple(simplex)
+        calls.append(simplex_t)
+        if simplex_t == (0, 1):
+            return _fake_predicate(simplex_t, accepted=False, alpha=2.0, dim=2)
+        return _fake_predicate(simplex_t, accepted=True, alpha=float(len(simplex_t)), dim=2)
+
+    monkeypatch.setattr(filtration_mod, "evaluate_predicates", fake_evaluate_predicates)
+
+    filt = filtration_mod.build_incremental_filtration(matrices, pts, max_dim=2)
+    simplices = _as_set(filt)
+
+    # (0,1) is rejected, so triangles containing this edge cannot be inserted
+    # and should be pruned before predicate evaluation.
+    assert (0, 1, 2) not in calls
+    assert (0, 1, 3) not in calls
+    assert (0, 2, 3) in calls
+    assert (1, 2, 3) in calls
+
+    assert (0, 1) not in simplices

@@ -71,6 +71,12 @@ def build_incremental_filtration(
             entries.append(FiltrationEntry(simplex=simplex, alpha=0.0, predicates=None))
             continue
 
+        faces = _codim_one_faces(simplex)
+        if any(face not in alpha_by_simplex for face in faces):
+            # Faces-first prune: if downward closure cannot be satisfied, skip
+            # expensive predicate/minimax evaluation for this simplex.
+            continue
+
         pred = evaluate_predicates(
             simplex,
             matrices,
@@ -80,10 +86,6 @@ def build_incremental_filtration(
             empty_tol=empty_tol,
         )
         if not pred.accepted:
-            continue
-
-        faces = _codim_one_faces(simplex)
-        if any(face not in alpha_by_simplex for face in faces):
             continue
 
         # Numerical monotonicity: enforce alpha(face) <= alpha(simplex).
