@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -10,8 +9,9 @@ from typing import Any
 
 import numpy as np
 
+from .backends.gudhi import GudhiBackend
+from .core.backend_contracts import PersistenceBackend
 from .filtration import FiltrationEntry, build_incremental_filtration
-from .gudhi_bridge import to_gudhi_simplex_tree
 from .minimax import solve_minimax_from_coefs
 
 DEFAULT_BASELINE_SEED = 20260306
@@ -31,7 +31,11 @@ class BaselineBarcodeAgreement:
     random_seed: int
     simplex_count: int
     edge_count: int
+    reference_backend: str | None
     h0_count_ours: int | None
+    h0_count_reference: int | None
+    h0_distance: float | None
+    h0_distance_metric: str | None
     h0_count_gudhi: int | None
     h0_bottleneck: float | None
     max_abs_edge_alpha_diff: float | None
@@ -51,6 +55,10 @@ class SixRingsH1Check:
     points_per_ring: int
     n_points: int
     random_seed: int
+    reference_backend: str | None
+    h1_count_reference: int | None
+    long_lived_h1_count_reference: int | None
+    top_h1_lifetimes_reference: list[float] | None
     h1_count: int | None
     long_lived_h1_count: int | None
     min_long_lived_h1: int
@@ -91,7 +99,7 @@ class ConditioningStressCheck:
 
 
 def has_gudhi() -> bool:
-    return importlib.util.find_spec("gudhi") is not None
+    return GudhiBackend().is_available()
 
 
 def _extract_edge_map_from_entries(
@@ -104,22 +112,6 @@ def _extract_edge_map_from_entries(
         i, j = entry.simplex
         edge_map[(i, j)] = float(entry.alpha)
     return edge_map
-
-
-def _extract_edge_map_from_simplex_tree(simplex_tree) -> dict[tuple[int, int], float]:
-    edge_map: dict[tuple[int, int], float] = {}
-    for simplex, alpha in simplex_tree.get_filtration():
-        if len(simplex) != 2:
-            continue
-        i, j = sorted(int(v) for v in simplex)
-        edge_map[(i, j)] = float(alpha)
-    return edge_map
-
-
-def _h0_intervals(simplex_tree) -> np.ndarray:
-    simplex_tree.persistence(homology_coeff_field=2)
-    intervals = simplex_tree.persistence_intervals_in_dimension(0)
-    return np.asarray(intervals, dtype=float)
 
 
 def _make_six_rings_points(
@@ -188,12 +180,15 @@ def run_baseline_barcode_agreement(
     random_seed: int = DEFAULT_BASELINE_SEED,
     edge_alpha_tol: float = 1e-6,
     bottleneck_tol: float = 1e-6,
+    backend: PersistenceBackend | None = None,
 ) -> BaselineBarcodeAgreement:
-    """Check H0 barcode agreement against GUDHI alpha complex on isotropic data."""
+    """Check H0 barcode agreement against a reference alpha-complex backend."""
     if dimension <= 0:
         raise ValueError("dimension must be positive")
     if n_points < 2:
         raise ValueError("n_points must be >= 2")
+
+    backend = backend or GudhiBackend()
 
     rng = np.random.default_rng(random_seed)
     centers = rng.standard_normal((n_points, dimension))
@@ -206,43 +201,50 @@ def run_baseline_barcode_agreement(
     )
     our_edges = _extract_edge_map_from_entries(filtration)
 
-    if not has_gudhi():
+    if not backend.is_available():
+        backend_name = getattr(backend, "name", None)
         return BaselineBarcodeAgreement(
             status="skipped",
-            message="gudhi is not installed; baseline comparison skipped.",
+            message=f"{backend_name} is not installed; baseline comparison skipped.",
             passed=None,
             n_points=n_points,
             dimension=dimension,
             random_seed=random_seed,
             simplex_count=len(filtration),
             edge_count=len(our_edges),
+            reference_backend=backend_name,
             h0_count_ours=None,
+            h0_count_reference=None,
+            h0_distance=None,
+            h0_distance_metric="bottleneck",
             h0_count_gudhi=None,
             h0_bottleneck=None,
             max_abs_edge_alpha_diff=None,
         )
 
-    import gudhi
+    ours_tree = backend.simplex_tree_from_filtration(filtration)
+    reference_tree = backend.alpha_complex_simplex_tree(centers)
 
-    ours_tree = to_gudhi_simplex_tree(filtration)
-    gudhi_tree = gudhi.AlphaComplex(points=centers).create_simplex_tree()
+    ours_h0 = backend.persistence_intervals(ours_tree, dimension=0, homology_coeff_field=2)
+    reference_h0 = backend.persistence_intervals(
+        reference_tree,
+        dimension=0,
+        homology_coeff_field=2,
+    )
+    h0_distance = backend.bottleneck_distance(ours_h0, reference_h0)
 
-    ours_h0 = _h0_intervals(ours_tree)
-    gudhi_h0 = _h0_intervals(gudhi_tree)
-    h0_bottleneck = float(gudhi.bottleneck_distance(ours_h0.tolist(), gudhi_h0.tolist()))
-
-    gudhi_edges = _extract_edge_map_from_simplex_tree(gudhi_tree)
-    common_edges = set(our_edges).intersection(gudhi_edges)
+    reference_edges = backend.edge_map(reference_tree)
+    common_edges = set(our_edges).intersection(reference_edges)
     if common_edges:
         max_abs_edge_alpha_diff = max(
-            abs(our_edges[e] - gudhi_edges[e]) for e in common_edges
+            abs(our_edges[e] - reference_edges[e]) for e in common_edges
         )
     else:
         max_abs_edge_alpha_diff = float("inf")
 
     passed = (
-        len(ours_h0) == len(gudhi_h0)
-        and h0_bottleneck <= bottleneck_tol
+        len(ours_h0) == len(reference_h0)
+        and h0_distance <= bottleneck_tol
         and max_abs_edge_alpha_diff <= edge_alpha_tol
     )
     message = (
@@ -260,9 +262,13 @@ def run_baseline_barcode_agreement(
         random_seed=random_seed,
         simplex_count=len(filtration),
         edge_count=len(our_edges),
+        reference_backend=backend.name,
         h0_count_ours=int(len(ours_h0)),
-        h0_count_gudhi=int(len(gudhi_h0)),
-        h0_bottleneck=h0_bottleneck,
+        h0_count_reference=int(len(reference_h0)),
+        h0_distance=h0_distance,
+        h0_distance_metric="bottleneck",
+        h0_count_gudhi=int(len(reference_h0)),
+        h0_bottleneck=h0_distance,
         max_abs_edge_alpha_diff=float(max_abs_edge_alpha_diff),
     )
 
@@ -276,8 +282,11 @@ def run_six_rings_h1_check(
     random_seed: int = DEFAULT_SIX_RINGS_SEED,
     lifetime_threshold: float = 0.25,
     min_long_lived_h1: int = 6,
+    backend: PersistenceBackend | None = None,
 ) -> SixRingsH1Check:
     """Check that a 6-rings dataset exposes at least 6 long-lived H1 classes."""
+    backend = backend or GudhiBackend()
+
     points = _make_six_rings_points(
         points_per_ring=points_per_ring,
         ring_radius=ring_radius,
@@ -286,15 +295,20 @@ def run_six_rings_h1_check(
         random_seed=random_seed,
     )
 
-    if not has_gudhi():
+    if not backend.is_available():
+        backend_name = getattr(backend, "name", None)
         return SixRingsH1Check(
             status="skipped",
-            message="gudhi is not installed; 6-rings H1 check skipped.",
+            message=f"{backend_name} is not installed; 6-rings H1 check skipped.",
             passed=None,
             rings=6,
             points_per_ring=points_per_ring,
             n_points=int(points.shape[0]),
             random_seed=random_seed,
+            reference_backend=backend_name,
+            h1_count_reference=None,
+            long_lived_h1_count_reference=None,
+            top_h1_lifetimes_reference=None,
             h1_count=None,
             long_lived_h1_count=None,
             min_long_lived_h1=min_long_lived_h1,
@@ -302,11 +316,8 @@ def run_six_rings_h1_check(
             top_h1_lifetimes=None,
         )
 
-    import gudhi
-
-    simplex_tree = gudhi.AlphaComplex(points=points).create_simplex_tree()
-    simplex_tree.persistence(homology_coeff_field=2)
-    h1 = np.asarray(simplex_tree.persistence_intervals_in_dimension(1), dtype=float)
+    simplex_tree = backend.alpha_complex_simplex_tree(points)
+    h1 = backend.persistence_intervals(simplex_tree, dimension=1, homology_coeff_field=2)
     if h1.size == 0:
         lifetimes = np.array([], dtype=float)
     else:
@@ -331,6 +342,10 @@ def run_six_rings_h1_check(
         points_per_ring=points_per_ring,
         n_points=int(points.shape[0]),
         random_seed=random_seed,
+        reference_backend=backend.name,
+        h1_count_reference=int(len(h1)),
+        long_lived_h1_count_reference=long_lived_count,
+        top_h1_lifetimes_reference=[float(v) for v in sorted_lifetimes[:10]],
         h1_count=int(len(h1)),
         long_lived_h1_count=long_lived_count,
         min_long_lived_h1=min_long_lived_h1,
