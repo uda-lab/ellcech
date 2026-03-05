@@ -70,6 +70,18 @@ def evaluate_predicates(
             centers[simplex_idx],
             **kwargs,
         )
+    else:
+        if len(minimax_result.weights) != len(simplex_t):
+            raise ValueError(
+                "minimax_result is incompatible with simplex: "
+                f"weights length {len(minimax_result.weights)} != {len(simplex_t)}"
+            )
+        if len(minimax_result.circumcenter) != centers.shape[1]:
+            raise ValueError(
+                "minimax_result is incompatible with centers: "
+                f"circumcenter dimension {len(minimax_result.circumcenter)} "
+                f"!= {centers.shape[1]}"
+            )
 
     alpha = float(minimax_result.alpha)
     xstar = minimax_result.circumcenter

@@ -1,5 +1,7 @@
 import numpy as np
+import pytest
 
+from ellphi_alpha.minimax import solve_minimax
 from ellphi_alpha.predicates import evaluate_predicates
 
 
@@ -56,3 +58,19 @@ def test_predicates_reject_non_converged_minimax():
     )
     assert not pred.p1_converged
     assert not pred.accepted
+
+
+def test_predicates_raise_for_incompatible_supplied_minimax_result():
+    pts = np.array(
+        [
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [0.0, 1.0],
+        ]
+    )
+    matrices = np.repeat(np.eye(2)[np.newaxis], 3, axis=0)
+
+    # Minimax computed for edge (2 weights), but supplied for triangle (3 vertices).
+    edge_result = solve_minimax(matrices[:2], pts[:2])
+    with pytest.raises(ValueError, match="incompatible with simplex"):
+        evaluate_predicates((0, 1, 2), matrices, pts, minimax_result=edge_result)
