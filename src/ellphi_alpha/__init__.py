@@ -15,11 +15,22 @@ Value correspondence (pairwise case |σ| = 2):
 """
 
 from ._version import __version__
+from .enumeration import enumerate_candidate_simplices, iter_candidate_simplices
+from .filtration import FiltrationEntry, build_incremental_filtration
+from .gudhi_bridge import to_gudhi_simplex_tree
 from .minimax import MinimaxResult, solve_minimax, solve_minimax_from_coefs
+from .predicates import PredicateResult, evaluate_predicates
 
 __all__ = [
     "__version__",
+    "enumerate_candidate_simplices",
+    "iter_candidate_simplices",
     "MinimaxResult",
     "solve_minimax",
     "solve_minimax_from_coefs",
+    "PredicateResult",
+    "evaluate_predicates",
+    "FiltrationEntry",
+    "build_incremental_filtration",
+    "to_gudhi_simplex_tree",
 ]

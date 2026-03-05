@@ -1,5 +1,29 @@
 # Development Log
 
+## Session 2026-03-06 — Gaps B-F
+
+### What was built
+
+- **Gap B (simplex enumeration)**: added `enumeration.py` with
+  `iter_candidate_simplices` and `enumerate_candidate_simplices` for
+  candidate simplices up to `max_dim`.
+- **Gap C (predicates P1-P3)**: added `predicates.py` with
+  `evaluate_predicates` and `PredicateResult`:
+  - P1: minimax convergence/feasibility check
+  - P2: boundary-contact geometric check on simplex vertices
+  - P3: empty-ball geometric check against outside vertices
+- **Gap D (incremental filtration)**: added `filtration.py` with
+  `build_incremental_filtration` and `FiltrationEntry`; uses B+C, enforces
+  downward closure and alpha monotonicity, and outputs alpha-sorted entries.
+- **Gap E (GUDHI bridge)**: added `gudhi_bridge.py` with
+  `to_gudhi_simplex_tree`; raises a clear runtime error when `gudhi` is absent.
+- **Gap F (numerical stability controls)**: extended `solve_minimax` and
+  `solve_minimax_from_coefs` with optional `regularization`,
+  `condition_number_limit`, and `max_conditioning_steps`; defaults preserve
+  prior behavior.
+- Updated package exports in `__init__.py`.
+- Added tests for all gaps and public API exports.
+
 ## Session 2026-03-05 — Initial Setup
 
 ### What was built
@@ -54,11 +78,11 @@ which is also the optimality condition for `alpha({i,j})`.
 | Gap | Status | Next action |
 |-----|--------|-------------|
 | Gap A (minimax solver) | **Done** (pairwise FW + bisection) | Consider C++ port when stable |
-| Gap B (simplex enumeration) | Not started | Phase 4.1: enumerate all (d+1)-simplices for n<=50 |
-| Gap C (predicates P1-P3) | Not started | Implement after Gap B |
-| Gap D (incremental construction) | Not started | Depends on B+C |
-| Gap E (GUDHI interface) | Not started | Depends on D |
-| Gap F (numerical stability) | Partial | active set shrinking via weight_tol in solver |
+| Gap B (simplex enumeration) | **Done** | Add candidate-pruning heuristics if needed |
+| Gap C (predicates P1-P3) | **Done** | Refine tolerance defaults empirically |
+| Gap D (incremental construction) | **Done** | Add larger-scale benchmarks |
+| Gap E (GUDHI interface) | **Done** | Add end-to-end PH examples in notebooks |
+| Gap F (numerical stability) | **Done** | Tune conditioning thresholds for production datasets |
 
 ### Environment
 
