@@ -12,9 +12,11 @@ import numpy as np
 
 from .filtration import FiltrationEntry, build_incremental_filtration
 from .gudhi_bridge import to_gudhi_simplex_tree
+from .minimax import solve_minimax_from_coefs
 
 DEFAULT_BASELINE_SEED = 20260306
 DEFAULT_SIX_RINGS_SEED = 20260307
+DEFAULT_CONDITIONING_SEED = 20260308
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,35 @@ class SixRingsH1Check:
     min_long_lived_h1: int
     lifetime_threshold: float
     top_h1_lifetimes: list[float] | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ConditioningStressCheck:
+    """Result bundle for the high-conditioning alpha error benchmark."""
+
+    status: str
+    message: str
+    passed: bool
+    n_cases: int
+    evaluated_cases: int
+    failed_cases: int
+    dimension: int
+    random_seed: int
+    min_condition_number: float
+    max_condition_number: float
+    cond_min_observed: float
+    cond_max_observed: float
+    rel_error_threshold: float
+    abs_error_threshold: float
+    max_rel_error: float
+    mean_rel_error: float
+    max_abs_error: float
+    mean_abs_error: float
+    over_threshold_cases: int
+    worst_cases: list[dict[str, float]]
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -131,6 +162,23 @@ def _make_six_rings_points(
             ring = ring + rng.normal(scale=noise, size=ring.shape)
         points.append(ring + c)
     return np.vstack(points)
+
+
+def _random_spd_with_target_condition(
+    rng: np.random.Generator,
+    *,
+    dimension: int,
+    target_condition: float,
+) -> np.ndarray:
+    if dimension < 2:
+        raise ValueError("dimension must be >= 2")
+    if target_condition <= 1.0:
+        raise ValueError("target_condition must be > 1")
+
+    q, _ = np.linalg.qr(rng.standard_normal((dimension, dimension)))
+    eigenvalues = np.geomspace(1.0, target_condition, num=dimension)
+    matrix = q @ np.diag(eigenvalues) @ q.T
+    return 0.5 * (matrix + matrix.T)
 
 
 def run_baseline_barcode_agreement(
@@ -288,6 +336,156 @@ def run_six_rings_h1_check(
         min_long_lived_h1=min_long_lived_h1,
         lifetime_threshold=lifetime_threshold,
         top_h1_lifetimes=[float(v) for v in sorted_lifetimes[:10]],
+    )
+
+
+def run_conditioning_stress_check(
+    *,
+    n_cases: int = 32,
+    dimension: int = 2,
+    min_condition_number: float = 1e6,
+    max_condition_number: float = 1e7,
+    random_seed: int = DEFAULT_CONDITIONING_SEED,
+    rel_error_threshold: float = 1e-4,
+    abs_error_threshold: float = 1e-3,
+) -> ConditioningStressCheck:
+    """Benchmark alpha error on high-condition-number pairwise problems."""
+    if n_cases <= 0:
+        raise ValueError("n_cases must be positive")
+    if dimension < 2:
+        raise ValueError("dimension must be >= 2")
+    if min_condition_number <= 1.0:
+        raise ValueError("min_condition_number must be > 1")
+    if max_condition_number < min_condition_number:
+        raise ValueError("max_condition_number must be >= min_condition_number")
+
+    import ellphi
+
+    rng = np.random.default_rng(random_seed)
+    abs_errors: list[float] = []
+    rel_errors: list[float] = []
+    observed_conds: list[float] = []
+    over_threshold_cases = 0
+    failed_cases = 0
+    worst_cases: list[dict[str, float]] = []
+
+    for idx in range(n_cases):
+        target_cond_0 = float(
+            10 ** rng.uniform(np.log10(min_condition_number), np.log10(max_condition_number))
+        )
+        target_cond_1 = float(
+            10 ** rng.uniform(np.log10(min_condition_number), np.log10(max_condition_number))
+        )
+        A0 = _random_spd_with_target_condition(
+            rng,
+            dimension=dimension,
+            target_condition=target_cond_0,
+        )
+        A1 = _random_spd_with_target_condition(
+            rng,
+            dimension=dimension,
+            target_condition=target_cond_1,
+        )
+        observed_cond = float(max(np.linalg.cond(A0), np.linalg.cond(A1)))
+        observed_conds.append(observed_cond)
+
+        centers = rng.standard_normal((2, dimension)) * 2.0
+        cov0 = np.linalg.inv(A0)
+        cov1 = np.linalg.inv(A1)
+
+        try:
+            pcoef = ellphi.coef_from_cov(centers[0], cov0)[0]
+            qcoef = ellphi.coef_from_cov(centers[1], cov1)[0]
+            expected_alpha = float(ellphi.tangency(pcoef, qcoef).t ** 2)
+            measured_alpha = float(
+                solve_minimax_from_coefs(
+                    np.stack([pcoef, qcoef]),
+                    tol=1e-10,
+                    max_iter=4000,
+                    regularization=1e-8,
+                    condition_number_limit=1e8,
+                    max_conditioning_steps=4,
+                ).alpha
+            )
+        except Exception:
+            failed_cases += 1
+            continue
+
+        abs_err = abs(measured_alpha - expected_alpha)
+        rel_err = abs_err / max(abs(expected_alpha), 1e-12)
+        abs_errors.append(abs_err)
+        rel_errors.append(rel_err)
+
+        if rel_err > rel_error_threshold or abs_err > abs_error_threshold:
+            over_threshold_cases += 1
+
+        worst_cases.append(
+            {
+                "case": float(idx),
+                "condition_number": observed_cond,
+                "expected_alpha": expected_alpha,
+                "measured_alpha": measured_alpha,
+                "abs_error": abs_err,
+                "rel_error": rel_err,
+            }
+        )
+
+    if rel_errors:
+        max_rel_error = float(np.max(rel_errors))
+        mean_rel_error = float(np.mean(rel_errors))
+        max_abs_error = float(np.max(abs_errors))
+        mean_abs_error = float(np.mean(abs_errors))
+    else:
+        max_rel_error = float("inf")
+        mean_rel_error = float("inf")
+        max_abs_error = float("inf")
+        mean_abs_error = float("inf")
+
+    if observed_conds:
+        cond_min_observed = float(np.min(observed_conds))
+        cond_max_observed = float(np.max(observed_conds))
+    else:
+        cond_min_observed = 0.0
+        cond_max_observed = 0.0
+
+    # Keep only the most error-prone samples for concise reporting.
+    worst_cases.sort(key=lambda row: row["rel_error"], reverse=True)
+    top_worst_cases = worst_cases[:5]
+
+    evaluated_cases = len(rel_errors)
+    passed = (
+        evaluated_cases > 0
+        and failed_cases == 0
+        and cond_min_observed > min_condition_number
+        and over_threshold_cases == 0
+    )
+    message = (
+        "Conditioning stress benchmark passed."
+        if passed
+        else "Conditioning stress benchmark failed threshold checks."
+    )
+
+    return ConditioningStressCheck(
+        status="ok" if passed else "failed",
+        message=message,
+        passed=passed,
+        n_cases=n_cases,
+        evaluated_cases=evaluated_cases,
+        failed_cases=failed_cases,
+        dimension=dimension,
+        random_seed=random_seed,
+        min_condition_number=min_condition_number,
+        max_condition_number=max_condition_number,
+        cond_min_observed=cond_min_observed,
+        cond_max_observed=cond_max_observed,
+        rel_error_threshold=rel_error_threshold,
+        abs_error_threshold=abs_error_threshold,
+        max_rel_error=max_rel_error,
+        mean_rel_error=mean_rel_error,
+        max_abs_error=max_abs_error,
+        mean_abs_error=mean_abs_error,
+        over_threshold_cases=over_threshold_cases,
+        worst_cases=top_worst_cases,
     )
 
 

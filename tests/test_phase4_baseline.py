@@ -46,3 +46,20 @@ def test_six_rings_h1_check_against_threshold():
     assert result.passed is True
     assert result.long_lived_h1_count is not None
     assert result.long_lived_h1_count >= 6
+
+
+def test_conditioning_stress_check_tracks_alpha_error():
+    result = acceptance.run_conditioning_stress_check(
+        n_cases=8,
+        dimension=2,
+        min_condition_number=1e6,
+        max_condition_number=1e7,
+        random_seed=20260308,
+        rel_error_threshold=1e-4,
+        abs_error_threshold=1e-3,
+    )
+    assert result.status == "ok"
+    assert result.passed is True
+    assert result.failed_cases == 0
+    assert result.over_threshold_cases == 0
+    assert result.cond_min_observed > 1e6

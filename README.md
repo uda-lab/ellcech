@@ -72,6 +72,22 @@ print(f"α(triangle) = {res3.alpha:.6f},  active set = {res3.active_set}")
 poetry run pytest
 ```
 
+## Phase-4 Acceptance Measurements
+
+```bash
+poetry run python scripts/run_phase4_acceptance.py --output-dir artifacts/phase4_acceptance
+```
+
+The runner writes:
+
+- `baseline_barcode_agreement.json` (d=2, n=100 check vs GUDHI baseline)
+- `six_rings_h1_check.json` (6-rings long-lived H1 check)
+- `conditioning_stress_check.json` (cond > 1e6 alpha-error tracking)
+- `phase4_acceptance_summary.json` (combined report)
+
+If `gudhi` is unavailable, the first two checks are reported as `skipped` while
+the conditioning benchmark still runs.
+
 ## Mathematical references
 
 - `paper-ellalpha/LeanEllAlpha/` — Lean 4 formalisations (T1–T9)

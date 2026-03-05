@@ -1,5 +1,39 @@
 # Development Log
 
+## Session 2026-03-06 — Phase-4 Acceptance Measurements
+
+### What was built
+
+- Added `src/ellphi_alpha/phase4_acceptance.py` to house reproducible
+  measurement routines and JSON report writing.
+- Added `scripts/run_phase4_acceptance.py` to run three checks and emit:
+  - `baseline_barcode_agreement.json`
+  - `six_rings_h1_check.json`
+  - `conditioning_stress_check.json`
+  - `phase4_acceptance_summary.json`
+- Added/extended pytest coverage in `tests/test_phase4_baseline.py`:
+  - baseline barcode agreement skip + GUDHI-backed test
+  - 6-rings H1 skip + GUDHI-backed test
+  - conditioning stress benchmark test (`cond > 1e6`, alpha error thresholds)
+
+### Measurement definitions
+
+- **A) Baseline barcode agreement**:
+  isotropic `d=2, n=100` point cloud, compare H0 barcode against
+  `gudhi.AlphaComplex` on the same points.
+- **B) 6-rings long-lived H1**:
+  deterministic 6-ring synthetic dataset; require at least six H1 intervals
+  above a persistence threshold.
+- **C) High-conditioning stress benchmark**:
+  random pairwise anisotropic instances with
+  `cond(A_i)` sampled in `[1e6, 1e7]`, reference alpha from
+  `ellphi.tangency(...).t**2`, tracked by max/mean abs+rel error thresholds.
+
+### Notes
+
+- If `gudhi` is not installed, A/B are marked `skipped` (not failed) and the
+  conditioning benchmark still runs.
+
 ## Session 2026-03-06 — Gaps B-F
 
 ### What was built

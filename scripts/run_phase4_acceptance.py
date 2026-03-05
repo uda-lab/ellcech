@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from ellphi_alpha.phase4_acceptance import (
+    run_conditioning_stress_check,
     run_baseline_barcode_agreement,
     run_six_rings_h1_check,
     write_json_report,
@@ -33,6 +34,12 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=20260307,
         help="Random seed for 6-rings H1 check.",
+    )
+    parser.add_argument(
+        "--conditioning-seed",
+        type=int,
+        default=20260308,
+        help="Random seed for high-conditioning stress check.",
     )
     return parser.parse_args()
 
@@ -72,7 +79,43 @@ def main() -> int:
     )
     print(f"[phase4-6rings] report={six_rings_path}")
 
-    if baseline.status == "failed" or six_rings.status == "failed":
+    conditioning = run_conditioning_stress_check(
+        n_cases=32,
+        dimension=2,
+        min_condition_number=1e6,
+        max_condition_number=1e7,
+        random_seed=args.conditioning_seed,
+        rel_error_threshold=1e-4,
+        abs_error_threshold=1e-3,
+    )
+    conditioning_path = write_json_report(
+        args.output_dir / "conditioning_stress_check.json",
+        conditioning.to_dict(),
+    )
+    print(
+        "[phase4-conditioning] "
+        f"status={conditioning.status} passed={conditioning.passed} "
+        f"max_rel_error={conditioning.max_rel_error:.3e} "
+        f"cond_range=[{conditioning.cond_min_observed:.3e}, "
+        f"{conditioning.cond_max_observed:.3e}]"
+    )
+    print(f"[phase4-conditioning] report={conditioning_path}")
+
+    summary_path = write_json_report(
+        args.output_dir / "phase4_acceptance_summary.json",
+        {
+            "baseline": baseline.to_dict(),
+            "six_rings": six_rings.to_dict(),
+            "conditioning": conditioning.to_dict(),
+        },
+    )
+    print(f"[phase4-summary] report={summary_path}")
+
+    if (
+        baseline.status == "failed"
+        or six_rings.status == "failed"
+        or conditioning.status == "failed"
+    ):
         return 1
     return 0
 
