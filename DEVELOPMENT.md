@@ -1,5 +1,72 @@
 # Development Log
 
+## Session 2026-03-06 — Minimax Solver Numerical Experiment (7 Methods)
+
+### What changed
+
+ellphi の root-finding では Brent 法 + Newton の「brentq+newton」が速度・精度・安定性の
+最適バランスとして確立された．ellphi-alpha の minimax solver でも同様の体系的実験を行い，
+最良の方法を選定するため，3 法→ **7 法**に拡張した．
+
+### 新メソッド（`minimax.py`）
+
+| method | 説明 | 新規/既存 |
+|---|---|---|
+| `fw+bisect` | 52 回固定 bisection line search (デフォルト) | 既存 |
+| `fw+brentq` | 適応的 brentq line search (通常 8–15 回) | **新規** |
+| `fw+bisect+newton` | FW(bisect) → Newton polishing | 既存 `fw+newton` のリネーム |
+| `fw+brentq+newton` | FW(brentq) → Armijo damped Newton | **新規（本命候補）** |
+| `fw+bisect+damped-newton` | FW(bisect) → Armijo damped Newton | **新規** |
+| `scipy-slsqp` | scipy SLSQP 直接解法 | 既存 |
+| `newton-cold` | 一様初期値からの Newton (安定性下界) | **新規** |
+
+`"fw+newton"` は `"fw+bisect+newton"` への deprecated エイリアスとして保持．
+
+### 新インフラ
+
+- **`_ensure_finite()`**: NaN/Inf 検出ガード（ellphi パターン）
+- **`_brentq_line_search()`**: scipy.optimize.brentq による適応的 line search，失敗時は bisection fallback
+- **`_damped_newton_polish()`**: Armijo backtracking + ヘシアン条件数チェック（>1e12 で正則化）
+- **`MinimaxResult.metadata`**: `fw_iters`, `newton_iters`, `hessian_cond`, `n_fevals`, `line_search_evals`
+
+### 実験インフラ（`benchmarks.py`）
+
+- **`make_ill_conditioned_simplex()`**: 対数スケール固有値で cond_target を達成
+- **`make_degenerate_simplex()`**: n_far 個の遠方頂点で近退化 active set を生成
+- **`ExperimentResult` / `ExperimentConfig`**: 実験データクラス
+- **`bootstrap_ci()`, `wilson_interval()`, `summarize_experiment()`**: 統計ヘルパー
+- **`run_experiment()`**: 因子格子の自動実行 + 参照値計算
+
+### 実験スクリプト（`scripts/run_full_experiment.py`）
+
+5 つの実験を CLI で実行可能：
+1. 基本速度・精度 (k×d 格子)
+2. 高条件数 (cond ∈ {2..10000})
+3. 近退化 (n_far ∈ {1,2,3})
+4. FW→Newton handoff (fw_tol sweep)
+5. brentq vs bisect
+
+出力: `artifacts/experiments/exp{N}_raw.json`, `exp{N}_summary.csv`
+
+### Exp 5 結果（brentq vs bisect, 200 instances/cell, seed=42）
+
+| k | fw+bisect t_med | fw+brentq t_med | speedup |
+|---|---|---|---|
+| 3 | 3.6 ms | 1.0 ms | **3.5x** |
+| 4 | 15.0 ms | 3.2 ms | **4.7x** |
+| 5 | 20.4 ms | 3.9 ms | **5.2x** |
+| 6 | 22.3 ms | 4.3 ms | **5.2x** |
+| 7 | 21.6 ms | 4.3 ms | **5.0x** |
+| 8 | 23.6 ms | 4.7 ms | **5.0x** |
+
+同一精度（rel_error median ~1e-9）で **brentq は bisect の約 5 倍高速**．
+brentq の適応的終了（~8–15 回の関数評価）vs bisect の固定 52 回による差．
+
+### テスト
+
+- 78 tests in `test_minimax_methods.py` (全 pass)
+- 全テストスイート: 133 passed, 2 skipped (GUDHI)
+
 ## Session 2026-03-06 — Backend-Decoupling Refactor
 
 ### What changed

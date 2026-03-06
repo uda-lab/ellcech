@@ -66,6 +66,25 @@ res3 = ea.solve_minimax(
 print(f"α(triangle) = {res3.alpha:.6f},  active set = {res3.active_set}")
 ```
 
+## Solver methods
+
+Seven solver methods are available via `method=`:
+
+| Method | Description |
+|---|---|
+| `fw+bisect` (default) | Pairwise FW with 52-step bisection line search |
+| `fw+brentq` | Pairwise FW with adaptive brentq line search (~5x faster) |
+| `fw+bisect+newton` | FW(bisect) + Newton polishing on active face |
+| `fw+brentq+newton` | FW(brentq) + Armijo-damped Newton (recommended) |
+| `fw+bisect+damped-newton` | FW(bisect) + Armijo-damped Newton |
+| `scipy-slsqp` | Direct SLSQP solve (reference solver) |
+| `newton-cold` | Newton from uniform start (stability baseline) |
+
+```python
+res = ea.solve_minimax(matrices, centers, method="fw+brentq+newton")
+print(res.metadata)  # {'fw_iters': 12, 'newton_iters': 3, 'hessian_cond': 42.1, ...}
+```
+
 ## Running tests
 
 ```bash
@@ -129,6 +148,21 @@ the conditioning benchmark still runs.
 Both `run_baseline_barcode_agreement(...)` and `run_six_rings_h1_check(...)`
 accept an optional `backend=` argument; by default they use `GudhiBackend` to
 preserve existing behavior.
+
+## Benchmarking
+
+```bash
+# Quick benchmark (k=2..6, all methods):
+poetry run python scripts/benchmark_minimax.py
+
+# Full numerical experiments (5 experiments):
+poetry run python scripts/run_full_experiment.py --experiments 1 2 3 4 5 --seed 42
+
+# Specific experiment with specific methods:
+poetry run python scripts/run_full_experiment.py --experiments 5 --methods fw+bisect fw+brentq
+```
+
+Results are saved to `artifacts/experiments/`.
 
 ## Mathematical references
 
