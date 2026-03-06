@@ -429,14 +429,14 @@ def run_conditioning_stress_check(
             pcoef = ellphi.coef_from_cov(centers[0], cov0)[0]
             qcoef = ellphi.coef_from_cov(centers[1], cov1)[0]
             expected_alpha = float(ellphi.tangency(pcoef, qcoef).t ** 2)
+            # No regularization: A(mu) is a convex combination of SPD matrices,
+            # hence always SPD.  cond(A(mu)) is bounded by the input condition
+            # numbers, which double precision handles without geometric distortion.
             measured_alpha = float(
                 solve_minimax_from_coefs(
                     np.stack([pcoef, qcoef]),
                     tol=1e-10,
                     max_iter=4000,
-                    regularization=1e-8,
-                    condition_number_limit=1e8,
-                    max_conditioning_steps=4,
                 ).alpha
             )
         except Exception:
