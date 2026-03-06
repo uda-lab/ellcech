@@ -32,3 +32,5 @@ def test_enumeration_argument_validation():
         list(iter_candidate_simplices(-1, max_dim=2))
     with pytest.raises(ValueError):
         list(iter_candidate_simplices(4, min_dim=-1, max_dim=2))
+    with pytest.raises(ValueError):
+        list(iter_candidate_simplices(4, max_dim=-1))

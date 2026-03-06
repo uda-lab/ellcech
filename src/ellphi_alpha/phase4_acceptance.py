@@ -39,6 +39,8 @@ class BaselineBarcodeAgreement:
     h0_count_gudhi: int | None
     h0_bottleneck: float | None
     max_abs_edge_alpha_diff: float | None
+    missing_edge_count: int | None
+    extra_edge_count: int | None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -220,6 +222,8 @@ def run_baseline_barcode_agreement(
             h0_count_gudhi=None,
             h0_bottleneck=None,
             max_abs_edge_alpha_diff=None,
+            missing_edge_count=None,
+            extra_edge_count=None,
         )
 
     ours_tree = backend.simplex_tree_from_filtration(filtration)
@@ -234,18 +238,27 @@ def run_baseline_barcode_agreement(
     h0_distance = backend.bottleneck_distance(ours_h0, reference_h0)
 
     reference_edges = backend.edge_map(reference_tree)
-    common_edges = set(our_edges).intersection(reference_edges)
+    our_edge_set = set(our_edges)
+    ref_edge_set = set(reference_edges)
+    common_edges = our_edge_set & ref_edge_set
+    missing_edge_count = int(len(ref_edge_set - our_edge_set))
+    extra_edge_count = int(len(our_edge_set - ref_edge_set))
     if common_edges:
-        max_abs_edge_alpha_diff = max(
+        max_abs_edge_alpha_diff: float | None = max(
             abs(our_edges[e] - reference_edges[e]) for e in common_edges
         )
     else:
-        max_abs_edge_alpha_diff = float("inf")
+        # No common edges: cannot compute alpha difference; report as None
+        # (float("inf") is not strict JSON and is misleading when edge sets are disjoint).
+        max_abs_edge_alpha_diff = None
 
+    edge_alpha_ok = max_abs_edge_alpha_diff is None or max_abs_edge_alpha_diff <= edge_alpha_tol
     passed = (
         len(ours_h0) == len(reference_h0)
         and h0_distance <= bottleneck_tol
-        and max_abs_edge_alpha_diff <= edge_alpha_tol
+        and edge_alpha_ok
+        and missing_edge_count == 0
+        and extra_edge_count == 0
     )
     message = (
         "H0 barcode agreement passed."
@@ -269,7 +282,9 @@ def run_baseline_barcode_agreement(
         h0_distance_metric="bottleneck",
         h0_count_gudhi=int(len(reference_h0)),
         h0_bottleneck=h0_distance,
-        max_abs_edge_alpha_diff=float(max_abs_edge_alpha_diff),
+        max_abs_edge_alpha_diff=float(max_abs_edge_alpha_diff) if max_abs_edge_alpha_diff is not None else None,
+        missing_edge_count=missing_edge_count,
+        extra_edge_count=extra_edge_count,
     )
 
 
@@ -401,7 +416,9 @@ def run_conditioning_stress_check(
             dimension=dimension,
             target_condition=target_cond_1,
         )
-        observed_cond = float(max(np.linalg.cond(A0), np.linalg.cond(A1)))
+        # Use min so that BOTH matrices in the pair must exceed the threshold.
+        # Using max would allow one under-conditioned matrix to slip through.
+        observed_cond = float(min(np.linalg.cond(A0), np.linalg.cond(A1)))
         observed_conds.append(observed_cond)
 
         centers = rng.standard_normal((2, dimension)) * 2.0

@@ -29,6 +29,8 @@ def iter_candidate_simplices(
     """
     if n_vertices < 0:
         raise ValueError("n_vertices must be non-negative")
+    if max_dim < 0:
+        raise ValueError("max_dim must be non-negative")
     if min_dim < 0:
         raise ValueError("min_dim must be non-negative")
     if max_dim < min_dim:

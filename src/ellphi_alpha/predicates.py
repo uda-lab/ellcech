@@ -82,6 +82,19 @@ def evaluate_predicates(
                 f"circumcenter dimension {len(minimax_result.circumcenter)} "
                 f"!= {centers.shape[1]}"
             )
+        # Geometry consistency: verify that the circumcenter actually achieves
+        # the supplied alpha on *this* simplex.  A result from a different simplex
+        # of the same shape would fail this check even though shape-only checks pass.
+        _diff = minimax_result.circumcenter[np.newaxis, :] - centers[simplex_idx]
+        _f = np.einsum("ki,kij,kj->k", _diff, matrices[simplex_idx], _diff)
+        _recomputed = float(np.max(_f))
+        _supplied = float(minimax_result.alpha)
+        if not np.isclose(_recomputed, _supplied, rtol=1e-4, atol=1e-8):
+            raise ValueError(
+                "minimax_result is inconsistent with the supplied simplex: "
+                f"circumcenter recomputed alpha {_recomputed:.6g} "
+                f"differs from supplied alpha {_supplied:.6g}"
+            )
 
     alpha = float(minimax_result.alpha)
     xstar = minimax_result.circumcenter

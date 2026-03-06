@@ -292,6 +292,9 @@ def solve_minimax(
 
     k, d = centers.shape
 
+    if k == 0:
+        raise ValueError("simplex must contain at least one vertex (k=0 given)")
+
     # --- Trivial case: single point ---
     if k == 1:
         return MinimaxResult(
@@ -374,6 +377,9 @@ def solve_minimax(
         max_conditioning_steps=max_conditioning_steps,
     )
     alpha = float(np.max(f))
+    # Non-finite result means the solve failed regardless of the FW gap criterion.
+    if not (np.isfinite(alpha) and np.all(np.isfinite(xstar))):
+        converged = False
     active_set = [i for i in range(k) if mu[i] > weight_tol]
 
     return MinimaxResult(

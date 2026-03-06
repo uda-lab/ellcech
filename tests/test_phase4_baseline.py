@@ -60,6 +60,8 @@ def test_baseline_barcode_agreement_skips_without_backend():
     assert result.passed is None
     assert "fake" in result.message
     assert result.reference_backend == "fake"
+    assert result.missing_edge_count is None
+    assert result.extra_edge_count is None
 
 
 def test_baseline_barcode_agreement_with_fake_backend():
@@ -77,6 +79,9 @@ def test_baseline_barcode_agreement_with_fake_backend():
     # Backward-compatible alias fields stay populated.
     assert result.h0_bottleneck == result.h0_distance
     assert result.h0_count_gudhi == result.h0_count_reference
+    # Edge-set completeness fields are populated.
+    assert result.missing_edge_count == 0
+    assert result.extra_edge_count == 0
 
 
 def test_baseline_barcode_agreement_against_gudhi():

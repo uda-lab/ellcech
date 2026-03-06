@@ -34,6 +34,13 @@ def _pairwise_alpha_ellphi(pcoef, qcoef):
 # ---------------------------------------------------------------------------
 
 class TestTrivialCases:
+    def test_empty_simplex_raises(self):
+        with pytest.raises(ValueError, match="k=0"):
+            solve_minimax(
+                np.zeros((0, 2, 2)),
+                np.zeros((0, 2)),
+            )
+
     def test_single_point_alpha_zero(self):
         A = np.eye(2)
         x = np.array([1.0, 2.0])

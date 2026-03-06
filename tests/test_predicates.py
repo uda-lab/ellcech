@@ -74,3 +74,27 @@ def test_predicates_raise_for_incompatible_supplied_minimax_result():
     edge_result = solve_minimax(matrices[:2], pts[:2])
     with pytest.raises(ValueError, match="incompatible with simplex"):
         evaluate_predicates((0, 1, 2), matrices, pts, minimax_result=edge_result)
+
+
+def test_predicates_raise_for_wrong_simplex_matching_shape():
+    """A result from a *different* simplex of the same shape must be rejected.
+
+    Shape-only checks (matching weight count and circumcenter dimension) would
+    accept this, but the geometry consistency check must detect the mismatch.
+    """
+    pts = np.array(
+        [
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [0.0, 1.0],
+            [10.0, 10.0],  # far away — a result for (0,1) is wrong for (2,3)
+        ]
+    )
+    matrices = np.repeat(np.eye(2)[np.newaxis], 4, axis=0)
+
+    # Result computed for edge (0, 1): circumcenter=[0.5,0], alpha=0.25
+    result_for_01 = solve_minimax(matrices[:2], pts[:2])
+
+    # Supplying it for edge (2, 3) has matching shape but wrong geometry.
+    with pytest.raises(ValueError, match="inconsistent with the supplied simplex"):
+        evaluate_predicates((2, 3), matrices, pts, minimax_result=result_for_01)
