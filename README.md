@@ -72,6 +72,20 @@ print(f"α(triangle) = {res3.alpha:.6f},  active set = {res3.active_set}")
 poetry run pytest
 ```
 
+## Notebook demo
+
+Run the executed practical example notebook:
+
+```bash
+poetry run jupyter nbconvert --to notebook --execute --inplace notebooks/practical_demo.ipynb
+```
+
+Open [notebooks/practical_demo.ipynb](notebooks/practical_demo.ipynb) to inspect:
+- pairwise `alpha` vs `ellphi.tangency(...).t**2`
+- `|sigma| >= 3` minimax and active set
+- incremental filtration entries
+- optional GUDHI adapter summary
+
 ## Backend architecture
 
 - Core solver, predicates, and filtration construction are backend-agnostic.
