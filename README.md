@@ -74,7 +74,10 @@ poetry run pytest
 
 ## Notebook demo
 
-Run the executed practical example notebook:
+Use `notebooks/practical_demo.ipynb` as the single canonical notebook for users.
+It combines quick numeric checks and visual walkthroughs in one place.
+
+Execute it in-place to embed fresh outputs:
 
 ```bash
 poetry run jupyter nbconvert --to notebook --execute --inplace notebooks/practical_demo.ipynb
@@ -83,8 +86,8 @@ poetry run jupyter nbconvert --to notebook --execute --inplace notebooks/practic
 Open [notebooks/practical_demo.ipynb](notebooks/practical_demo.ipynb) to inspect:
 - pairwise `alpha` vs `ellphi.tangency(...).t**2`
 - `|sigma| >= 3` minimax and active set
-- incremental filtration entries
-- optional GUDHI adapter summary
+- filtration graph snapshot up to an alpha threshold
+- optional GUDHI persistence summary (with H1 lifetime plot when available)
 
 ## Backend architecture
 
