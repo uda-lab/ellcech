@@ -17,9 +17,6 @@ __all__ = [
     "normalize_simplex",
 ]
 
-FiltrationLikeEntry: TypeAlias = FiltrationEntry | tuple[Sequence[int], float]
-
-
 @dataclass(frozen=True)
 class NormalizedFiltrationEntry:
     """Canonical filtration entry representation for backend adapters."""
@@ -28,21 +25,43 @@ class NormalizedFiltrationEntry:
     alpha: float
 
 
+# NormalizedFiltrationEntry is included so that the output of normalize_filtration()
+# can be fed back into a second normalization call without type errors.
+FiltrationLikeEntry: TypeAlias = FiltrationEntry | NormalizedFiltrationEntry | tuple[Sequence[int], float]
+
+
 def normalize_simplex(simplex: Sequence[int]) -> tuple[int, ...]:
-    """Normalize simplex vertices to a sorted tuple of unique integers."""
-    normalized = tuple(int(v) for v in simplex)
-    if not normalized:
+    """Normalize simplex vertices to a sorted tuple of unique integers.
+
+    Raises ValueError for non-integer vertex labels to prevent silent
+    truncation (e.g. float 3.7 → int 3) from corrupting simplex identities.
+    """
+    try:
+        import numpy as np
+        _int_types = (int, np.integer)
+    except ImportError:
+        _int_types = (int,)
+    normalized = []
+    for v in simplex:
+        if not isinstance(v, _int_types):
+            raise ValueError(
+                f"simplex vertex {v!r} has type {type(v).__name__!r}; "
+                "expected an integer type"
+            )
+        normalized.append(int(v))
+    normalized_t = tuple(normalized)
+    if not normalized_t:
         raise ValueError("simplex must be non-empty")
-    if len(set(normalized)) != len(normalized):
-        raise ValueError(f"simplex has duplicate vertices: {normalized}")
-    if normalized != tuple(sorted(normalized)):
-        normalized = tuple(sorted(normalized))
-    return normalized
+    if len(set(normalized_t)) != len(normalized_t):
+        raise ValueError(f"simplex has duplicate vertices: {normalized_t}")
+    if normalized_t != tuple(sorted(normalized_t)):
+        normalized_t = tuple(sorted(normalized_t))
+    return normalized_t
 
 
 def normalize_filtration_entry(entry: FiltrationLikeEntry) -> NormalizedFiltrationEntry:
     """Normalize one filtration entry from public input shapes."""
-    if isinstance(entry, FiltrationEntry):
+    if isinstance(entry, (FiltrationEntry, NormalizedFiltrationEntry)):
         simplex = normalize_simplex(entry.simplex)
         alpha = float(entry.alpha)
     else:

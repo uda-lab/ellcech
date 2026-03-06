@@ -26,31 +26,57 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--baseline-seed",
         type=int,
-        default=20260306,
-        help="Random seed for baseline agreement check.",
+        default=None,
+        help="Random seed for baseline agreement check (default: 20260306).",
     )
     parser.add_argument(
         "--rings-seed",
         type=int,
-        default=20260307,
-        help="Random seed for 6-rings H1 check.",
+        default=None,
+        help="Random seed for 6-rings H1 check (default: 20260307).",
     )
     parser.add_argument(
         "--conditioning-seed",
         type=int,
-        default=20260308,
-        help="Random seed for high-conditioning stress check.",
+        default=None,
+        help="Random seed for high-conditioning stress check (default: 20260308).",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help=(
+            "[Deprecated] Set the same random seed for all three checks. "
+            "Use --baseline-seed, --rings-seed, --conditioning-seed instead. "
+            "Specific seed flags take precedence over --seed when both are given."
+        ),
     )
     return parser.parse_args()
+
+
+_DEFAULT_BASELINE_SEED = 20260306
+_DEFAULT_RINGS_SEED = 20260307
+_DEFAULT_CONDITIONING_SEED = 20260308
 
 
 def main() -> int:
     args = parse_args()
 
+    # Resolve seeds: specific flag > deprecated --seed > hard-coded default.
+    baseline_seed = args.baseline_seed if args.baseline_seed is not None else (
+        args.seed if args.seed is not None else _DEFAULT_BASELINE_SEED
+    )
+    rings_seed = args.rings_seed if args.rings_seed is not None else (
+        args.seed if args.seed is not None else _DEFAULT_RINGS_SEED
+    )
+    conditioning_seed = args.conditioning_seed if args.conditioning_seed is not None else (
+        args.seed if args.seed is not None else _DEFAULT_CONDITIONING_SEED
+    )
+
     baseline = run_baseline_barcode_agreement(
         n_points=100,
         dimension=2,
-        random_seed=args.baseline_seed,
+        random_seed=baseline_seed,
     )
     baseline_path = write_json_report(
         args.output_dir / "baseline_barcode_agreement.json",
@@ -66,7 +92,7 @@ def main() -> int:
 
     six_rings = run_six_rings_h1_check(
         points_per_ring=24,
-        random_seed=args.rings_seed,
+        random_seed=rings_seed,
     )
     six_rings_path = write_json_report(
         args.output_dir / "six_rings_h1_check.json",
@@ -84,7 +110,7 @@ def main() -> int:
         dimension=2,
         min_condition_number=1e6,
         max_condition_number=1e7,
-        random_seed=args.conditioning_seed,
+        random_seed=conditioning_seed,
         rel_error_threshold=1e-4,
         abs_error_threshold=1e-3,
     )

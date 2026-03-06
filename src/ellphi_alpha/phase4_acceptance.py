@@ -190,7 +190,7 @@ def run_baseline_barcode_agreement(
     if n_points < 2:
         raise ValueError("n_points must be >= 2")
 
-    backend = backend or GudhiBackend()
+    backend = GudhiBackend() if backend is None else backend
 
     rng = np.random.default_rng(random_seed)
     centers = rng.standard_normal((n_points, dimension))
@@ -300,7 +300,7 @@ def run_six_rings_h1_check(
     backend: PersistenceBackend | None = None,
 ) -> SixRingsH1Check:
     """Check that a 6-rings dataset exposes at least 6 long-lived H1 classes."""
-    backend = backend or GudhiBackend()
+    backend = GudhiBackend() if backend is None else backend
 
     points = _make_six_rings_points(
         points_per_ring=points_per_ring,

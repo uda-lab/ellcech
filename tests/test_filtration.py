@@ -163,6 +163,30 @@ def test_build_incremental_filtration_predicate_cache_reuses_results(monkeypatch
     assert [entry.alpha for entry in second] == [entry.alpha for entry in first]
 
 
+def test_build_incremental_filtration_predicate_cache_invalidated_on_dataset_change(monkeypatch):
+    """Cache must not reuse results when the dataset (matrices/centers) changes."""
+    pts_a = np.array([[0.0, 0.0], [2.0, 0.0], [1.0, np.sqrt(3.0)]])
+    pts_b = np.array([[0.0, 0.0], [3.0, 0.0], [1.5, np.sqrt(3.0)]])  # different
+    matrices = np.repeat(np.eye(2)[np.newaxis], 3, axis=0)
+    calls: list[tuple] = []
+
+    def fake_evaluate_predicates(simplex, *_args, **_kwargs):
+        simplex_t = tuple(simplex)
+        calls.append(simplex_t)
+        return _fake_predicate(simplex_t, accepted=True, alpha=float(len(simplex_t)), dim=2)
+
+    monkeypatch.setattr(filtration_mod, "evaluate_predicates", fake_evaluate_predicates)
+
+    cache = {}
+    filtration_mod.build_incremental_filtration(matrices, pts_a, max_dim=2, predicate_cache=cache)
+    n_after_first = len(calls)
+
+    # Different dataset: cache must miss for all simplices.
+    filtration_mod.build_incremental_filtration(matrices, pts_b, max_dim=2, predicate_cache=cache)
+    n_after_second = len(calls)
+    assert n_after_second - n_after_first == n_after_first  # same number of fresh evals
+
+
 def test_build_incremental_filtration_predicate_cache_respects_settings(monkeypatch):
     pts = np.array(
         [

@@ -21,6 +21,7 @@ PredicateCacheKey: TypeAlias = tuple[
     tuple[tuple[str, Hashable], ...],  # normalized minimax kwargs
     float,  # boundary_tol
     float,  # empty_tol
+    tuple,  # dataset fingerprint (shape + dtype + content hash)
 ]
 
 
@@ -56,12 +57,31 @@ def _freeze_cache_value(value: object) -> Hashable:
     return repr(value)
 
 
+def _dataset_fingerprint(matrices: np.ndarray, centers: np.ndarray) -> tuple:
+    """Content-based fingerprint for dataset identity (within-process cache only).
+
+    Uses shape, dtype, and a hash of the raw bytes so that the same numpy
+    content produces the same fingerprint.  Two different dataset objects with
+    different content will (with overwhelming probability) produce different
+    fingerprints, preventing stale cache hits across distinct datasets.
+    """
+    return (
+        matrices.shape,
+        matrices.dtype.str,
+        hash(matrices.tobytes()),
+        centers.shape,
+        centers.dtype.str,
+        hash(centers.tobytes()),
+    )
+
+
 def _predicate_cache_key(
     simplex: tuple[int, ...],
     *,
     minimax_kwargs: Mapping[str, object] | None,
     boundary_tol: float,
     empty_tol: float,
+    dataset_fp: tuple,
 ) -> PredicateCacheKey:
     frozen_kwargs = tuple(
         sorted(
@@ -69,7 +89,7 @@ def _predicate_cache_key(
             for k, v in (minimax_kwargs or {}).items()
         )
     )
-    return (simplex, frozen_kwargs, float(boundary_tol), float(empty_tol))
+    return (simplex, frozen_kwargs, float(boundary_tol), float(empty_tol), dataset_fp)
 
 
 def build_incremental_filtration(
@@ -115,6 +135,10 @@ def build_incremental_filtration(
     alpha_by_simplex: dict[tuple[int, ...], float] = {}
     entries: list[FiltrationEntry] = []
 
+    # Compute dataset fingerprint once per call so the cache is invalidated
+    # if matrices or centers change between calls.
+    dataset_fp = _dataset_fingerprint(matrices, centers) if predicate_cache is not None else ()
+
     for simplex in iter_candidate_simplices(n_vertices, max_dim=max_dim):
         if len(simplex) == 1:
             alpha_by_simplex[simplex] = 0.0
@@ -135,6 +159,7 @@ def build_incremental_filtration(
                 minimax_kwargs=minimax_kwargs,
                 boundary_tol=boundary_tol,
                 empty_tol=empty_tol,
+                dataset_fp=dataset_fp,
             )
             pred = predicate_cache.get(cache_key)
 
