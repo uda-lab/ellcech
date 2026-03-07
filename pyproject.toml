@@ -1,10 +1,11 @@
 [project]
 name = "ellphi-alpha"
-version = "0.1.0.dev0"
-description = "Experimental anisotropic alpha complex for ellipsoid-based TDA"
+version = "0.1.0"
+description = "Anisotropic alpha complex for ellipsoid-based topological data analysis"
 authors = [
   { name = "Tomoki Uda", email = "tomoki.uda@gmail.com" }
 ]
+homepage = "https://github.com/uda/ellphi-alpha"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [

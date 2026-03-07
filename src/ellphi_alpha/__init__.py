@@ -19,6 +19,7 @@ from .enumeration import enumerate_candidate_simplices, iter_candidate_simplices
 from .filtration import FiltrationEntry, build_incremental_filtration
 from .gudhi_bridge import to_gudhi_simplex_tree
 from .minimax import MinimaxResult, solve_minimax, solve_minimax_from_coefs
+from .minimax_grad import GradientResult, compute_gradient
 from .predicates import PredicateResult, evaluate_predicates
 
 __all__ = [
@@ -28,6 +29,8 @@ __all__ = [
     "MinimaxResult",
     "solve_minimax",
     "solve_minimax_from_coefs",
+    "GradientResult",
+    "compute_gradient",
     "PredicateResult",
     "evaluate_predicates",
     "FiltrationEntry",
