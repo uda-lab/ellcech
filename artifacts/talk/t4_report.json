@@ -1,0 +1,38 @@
+{
+  "booleanity_violations": 0,
+  "critical_value_check": {
+    "checked": 80,
+    "violations": []
+  },
+  "essential_h1_births": [
+    0.027841101913942585,
+    0.031704375874423325
+  ],
+  "essential_h1_count": 2,
+  "h1_count": 2,
+  "n_critical": 80,
+  "n_points": 40,
+  "r_max": 0.25358058366337033,
+  "stats": {
+    "after_pairwise_candidates": 271,
+    "brute_force_candidates": 10700,
+    "dimension": 2,
+    "emitted": 271,
+    "evaluated_candidates": 274,
+    "gl_clique_candidates": 280,
+    "max_dim": 2,
+    "n_vertices": 40,
+    "r_max": 0.25358058366337033,
+    "radius_L": 1.0071357101470892,
+    "rayleigh_m": 0.9999999999999998,
+    "rejected": 3,
+    "reuses": 114,
+    "solves": 120,
+    "uncertain": 0,
+    "wall_time_s": 0.12263441696995869
+  },
+  "statuses": {
+    "certified": 271
+  },
+  "top_finite_h1_lifetimes": []
+}

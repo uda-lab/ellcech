@@ -284,7 +284,11 @@ def certified_filtration(
                 retained_adjacency[j].add(i)
                 register(simplex, max(upper, 0.0), cert._replace(status="uncertain"), "solved")
 
-    after_pairwise = n + sum(len(a) for a in retained_adjacency) // 2
+    # Pairwise pruning (theorem C) acts on candidates of dimension >= 2:
+    # vertices and G_L edges are evaluated directly, higher candidates are
+    # restricted to cliques of the retained-edge graph.
+    gl_edge_count = sum(len(a) for a in adjacency) // 2
+    after_pairwise = n + gl_edge_count
     evaluated = n + solves
 
     # Dimensions >= 2: cliques of the retained-edge graph, face-checked

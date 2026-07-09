@@ -1,0 +1,5 @@
+simplex,alpha,raw_active_set,certified_support,status
+0 1,1.000000000,0 1,0 1,certified
+2 3,1.000000000,0 1,2 3,certified
+1 2 3,1.000000000,0 1 2,2 3,escalated
+0 1 2 3,1.000000000,0 1 2 3,0 1 2 3,degenerate

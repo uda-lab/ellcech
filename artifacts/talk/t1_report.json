@@ -1,0 +1,192 @@
+{
+  "centers": [
+    [
+      -1.0,
+      0.0
+    ],
+    [
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      -1.0
+    ],
+    [
+      0.0,
+      1.0
+    ]
+  ],
+  "exact": [
+    {
+      "alpha": 1.0,
+      "certified_support": [
+        0,
+        1
+      ],
+      "circumcenter": [
+        0.0,
+        0.0
+      ],
+      "raw_active_set": [
+        0,
+        1
+      ],
+      "simplex": [
+        0,
+        1
+      ],
+      "status": "certified"
+    },
+    {
+      "alpha": 1.0,
+      "certified_support": [
+        2,
+        3
+      ],
+      "circumcenter": [
+        0.0,
+        0.0
+      ],
+      "raw_active_set": [
+        0,
+        1
+      ],
+      "simplex": [
+        2,
+        3
+      ],
+      "status": "certified"
+    },
+    {
+      "alpha": 1.0000000003821425,
+      "certified_support": [
+        2,
+        3
+      ],
+      "circumcenter": [
+        9.215235e-06,
+        2.1e-11
+      ],
+      "raw_active_set": [
+        0,
+        1,
+        2
+      ],
+      "simplex": [
+        1,
+        2,
+        3
+      ],
+      "status": "escalated"
+    },
+    {
+      "alpha": 1.0,
+      "certified_support": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "circumcenter": [
+        0.0,
+        0.0
+      ],
+      "raw_active_set": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "simplex": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "status": "degenerate"
+    }
+  ],
+  "exact_sweep": {
+    "booleanity_violations": 1,
+    "statuses": {
+      "certified": 15
+    },
+    "violation_supports": [
+      [
+        0,
+        1
+      ]
+    ]
+  },
+  "matrices": [
+    [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        2.0
+      ]
+    ],
+    [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        3.0
+      ]
+    ],
+    [
+      [
+        4.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    [
+      [
+        5.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ]
+  ],
+  "perturbed_delta_0.001": {
+    "booleanity_violations": 0,
+    "full_simplex_alpha": 0.9996907576907241,
+    "full_simplex_support": [
+      0,
+      1,
+      2
+    ],
+    "n_critical": 9,
+    "n_simplices": 15,
+    "statuses": {
+      "certified": 15
+    }
+  },
+  "perturbed_delta_0.01": {
+    "booleanity_violations": 0,
+    "full_simplex_alpha": 0.9969852967479871,
+    "full_simplex_support": [
+      0,
+      1,
+      2
+    ],
+    "n_critical": 9,
+    "n_simplices": 15,
+    "statuses": {
+      "certified": 15
+    }
+  }
+}

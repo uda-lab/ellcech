@@ -1,0 +1,7 @@
+n,seed,r_max,n_simplices,n_fibers,booleanity_violations,n_critical,checked_endpoints,critical_value_violations,statuses
+10,101,0.821422,70,41,0,25,25,0,certified:70
+10,102,0.968785,72,40,0,29,29,0,certified:72
+10,103,1.110331,62,42,0,29,29,0,certified:62
+15,101,0.998566,254,94,0,39,39,0,certified:254
+15,102,1.022450,269,96,0,38,38,0,certified:269
+15,103,1.796560,246,83,0,35,35,0,certified:246
