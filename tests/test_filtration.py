@@ -64,7 +64,25 @@ def test_build_incremental_filtration_triangle_downward_closed():
             assert alpha_map[face] <= alpha + 1e-12
 
 
-def test_build_incremental_filtration_predicate_rejects_triangle():
+def test_build_incremental_filtration_critical_only_rejects_triangle():
+    pts = np.array(
+        [
+            [0.0, 0.0],
+            [2.0, 0.0],
+            [1.0, np.sqrt(3.0)],
+            [1.0, np.sqrt(3.0) / 3.0],  # inside circum-ball of (0,1,2)
+        ]
+    )
+    matrices = np.repeat(np.eye(2)[np.newaxis], 4, axis=0)
+
+    filt = build_incremental_filtration(matrices, pts, max_dim=2, mode="critical-only")
+    simplices = _as_set(filt)
+    assert (0, 1, 2) not in simplices
+
+
+def test_build_incremental_filtration_cech_mode_keeps_non_empty_simplices():
+    # Cech semantics (default): P3 emptiness does not gate membership, so the
+    # triangle whose circum-ball contains point 3 still enters with its alpha.
     pts = np.array(
         [
             [0.0, 0.0],
@@ -76,8 +94,10 @@ def test_build_incremental_filtration_predicate_rejects_triangle():
     matrices = np.repeat(np.eye(2)[np.newaxis], 4, axis=0)
 
     filt = build_incremental_filtration(matrices, pts, max_dim=2)
-    simplices = _as_set(filt)
-    assert (0, 1, 2) not in simplices
+    alpha_map = {entry.simplex: entry.alpha for entry in filt}
+    assert (0, 1, 2) in alpha_map
+    # Equilateral side 2: circumradius^2 = 4/3.
+    assert abs(alpha_map[(0, 1, 2)] - 4.0 / 3.0) < 1e-8
 
 
 def test_build_incremental_filtration_max_dim_one():
@@ -109,7 +129,9 @@ def test_build_incremental_filtration_faces_first_prune_skips_eval(monkeypatch):
 
     monkeypatch.setattr(filtration_mod, "evaluate_predicates", fake_evaluate_predicates)
 
-    filt = filtration_mod.build_incremental_filtration(matrices, pts, max_dim=2)
+    filt = filtration_mod.build_incremental_filtration(
+        matrices, pts, max_dim=2, mode="critical-only"
+    )
     simplices = _as_set(filt)
 
     # (0,1) is rejected, so triangles containing this edge cannot be inserted

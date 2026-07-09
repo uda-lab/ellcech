@@ -196,7 +196,9 @@ def certified_filtration(
     kwargs = dict(minimax_kwargs or {})
 
     m = rayleigh_lower_bound(matrices)
-    radius = 2.0 * math.sqrt(r_max / m)
+    # value_tol under the root keeps boundary simplices (alpha == r_max) in
+    # G_L despite sqrt/square rounding.
+    radius = 2.0 * math.sqrt((r_max + value_tol) / m)
     adjacency = neighbour_graph(centers, radius)
 
     brute_force = sum(math.comb(n, k) for k in range(1, max_dim + 2))

@@ -97,12 +97,30 @@ def build_incremental_filtration(
     centers: np.ndarray,
     *,
     max_dim: int,
+    mode: str = "cech",
     minimax_kwargs: Mapping[str, object] | None = None,
     boundary_tol: float = 1e-7,
     empty_tol: float = 1e-7,
     predicate_cache: MutableMapping[PredicateCacheKey, PredicateResult] | None = None,
 ) -> list[FiltrationEntry]:
     """Build filtration entries using candidate enumeration + P1-P3 checks.
+
+    Membership semantics (``mode``):
+
+    - ``"cech"`` (default): every candidate whose minimax solve is trusted
+      (predicate P1) enters with its alpha value.  This is the anisotropic
+      Cech filtration (theorem A semantics): P2/P3 are still evaluated and
+      recorded, but they characterize *critical* simplices, not membership.
+      The persistence of this filtration is the ground truth.
+    - ``"critical-only"``: the historical behaviour — a simplex enters only
+      if P1-P3 all pass.  This keeps only Del^aniso-candidate simplices and
+      is NOT persistence-correct in general: simplices whose value is
+      inherited from a proper act support (e.g. non-Gabriel Delaunay edges
+      in the Euclidean specialization) are dropped instead of receiving
+      their inherited value.  Available for comparison experiments only.
+
+    For an ``r_max``-bounded construction with certified pruning and value
+    reuse, use :func:`ellphi_alpha.pruning.certified_filtration` instead.
 
     The builder enforces:
     1. Downward closure: each inserted simplex has all codimension-1 faces present.
@@ -113,8 +131,11 @@ def build_incremental_filtration(
     - Provide ``predicate_cache`` (typically a dict) to reuse predicate/minimax
       results across repeated builds on the same dataset and settings.
     - Cache keys include simplex, ``minimax_kwargs``, ``boundary_tol``, and
-      ``empty_tol``.
+      ``empty_tol`` (results are mode-independent, so one cache serves both
+      modes).
     """
+    if mode not in ("cech", "critical-only"):
+        raise ValueError(f"unknown mode: {mode!r}")
     matrices = np.asarray(matrices, dtype=float)
     centers = np.asarray(centers, dtype=float)
 
@@ -175,7 +196,8 @@ def build_incremental_filtration(
             if predicate_cache is not None and cache_key is not None:
                 predicate_cache[cache_key] = pred
 
-        if not pred.accepted:
+        accepted = pred.p1_converged if mode == "cech" else pred.accepted
+        if not accepted:
             continue
 
         # Numerical monotonicity: enforce alpha(face) <= alpha(simplex).

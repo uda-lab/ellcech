@@ -11,8 +11,9 @@ import numpy as np
 
 from .backends.gudhi import GudhiBackend
 from .core.backend_contracts import PersistenceBackend
-from .filtration import FiltrationEntry, build_incremental_filtration
+from .filtration import FiltrationEntry
 from .minimax import solve_minimax_from_coefs
+from .pruning import certified_filtration
 
 DEFAULT_BASELINE_SEED = 20260306
 DEFAULT_SIX_RINGS_SEED = 20260307
@@ -21,7 +22,15 @@ DEFAULT_CONDITIONING_SEED = 20260308
 
 @dataclass(frozen=True)
 class BaselineBarcodeAgreement:
-    """Result bundle for the Phase-4 baseline barcode agreement check."""
+    """Result bundle for the Phase-4 baseline barcode agreement check.
+
+    Acceptance is persistence-level: H0 *and* H1 bottleneck distances of the
+    certified Cech filtration (truncated at ``r_max``) against the reference
+    alpha complex on isotropic data.  Edge-set comparison against the Delaunay
+    edges is informational only — Cech membership is not edge-set equality
+    (non-Delaunay Cech edges are expected, and their presence does not change
+    the persistence).
+    """
 
     status: str
     message: str
@@ -29,13 +38,17 @@ class BaselineBarcodeAgreement:
     n_points: int
     dimension: int
     random_seed: int
+    r_max: float
     simplex_count: int
     edge_count: int
     reference_backend: str | None
     h0_count_ours: int | None
     h0_count_reference: int | None
     h0_distance: float | None
-    h0_distance_metric: str | None
+    h1_count_ours: int | None
+    h1_count_reference: int | None
+    h1_distance: float | None
+    distance_metric: str | None
     h0_count_gudhi: int | None
     h0_bottleneck: float | None
     max_abs_edge_alpha_diff: float | None
@@ -175,16 +188,42 @@ def _random_spd_with_target_condition(
     return 0.5 * (matrix + matrix.T)
 
 
+def _truncate_intervals(intervals: np.ndarray, r_max: float) -> np.ndarray:
+    """Persistence of the filtration truncated at ``r_max``.
+
+    Classes born after ``r_max`` disappear; classes still alive at ``r_max``
+    become essential (death = inf).  Applying the same truncation to both
+    diagrams makes them comparable even when one filtration is only built up
+    to ``r_max``.
+    """
+    arr = np.asarray(intervals, dtype=float).reshape(-1, 2)
+    if arr.size == 0:
+        return arr
+    arr = arr[arr[:, 0] <= r_max].copy()
+    arr[arr[:, 1] > r_max, 1] = np.inf
+    return arr
+
+
 def run_baseline_barcode_agreement(
     *,
     n_points: int = 100,
     dimension: int = 2,
     random_seed: int = DEFAULT_BASELINE_SEED,
+    r_max_quantile: float = 25.0,
     edge_alpha_tol: float = 1e-6,
     bottleneck_tol: float = 1e-6,
     backend: PersistenceBackend | None = None,
 ) -> BaselineBarcodeAgreement:
-    """Check H0 barcode agreement against a reference alpha-complex backend."""
+    """Check H0 and H1 barcode agreement against a reference alpha complex.
+
+    Builds the certified anisotropic Cech filtration (isotropic input, so the
+    ground truth is the Euclidean alpha complex) up to ``r_max`` (a quantile
+    of the pairwise alpha values) with ``max_dim = 2``, and compares the
+    H0 *and* H1 persistence of both filtrations truncated at ``r_max``.
+    Edge-set differences against the Delaunay edges are reported for
+    information only: Cech membership legitimately contains non-Delaunay
+    edges, and persistence — not the edge set — is what the theory equates.
+    """
     if dimension <= 0:
         raise ValueError("dimension must be positive")
     if n_points < 2:
@@ -195,12 +234,21 @@ def run_baseline_barcode_agreement(
     rng = np.random.default_rng(random_seed)
     centers = rng.standard_normal((n_points, dimension))
     matrices = np.repeat(np.eye(dimension, dtype=float)[np.newaxis, :, :], n_points, axis=0)
-    filtration = build_incremental_filtration(
+
+    # Isotropic pairwise alpha values are ||x_i - x_j||^2 / 4.
+    diff = centers[:, np.newaxis, :] - centers[np.newaxis, :, :]
+    pairwise_alpha = np.einsum("ijk,ijk->ij", diff, diff) / 4.0
+    upper = pairwise_alpha[np.triu_indices(n_points, k=1)]
+    r_max = float(np.percentile(upper, r_max_quantile))
+
+    certified = certified_filtration(
         matrices,
         centers,
-        max_dim=1,
+        r_max=r_max,
+        max_dim=2,
         minimax_kwargs={"tol": 1e-10, "max_iter": 2000},
     )
+    filtration = certified.entries
     our_edges = _extract_edge_map_from_entries(filtration)
 
     if not backend.is_available():
@@ -212,13 +260,17 @@ def run_baseline_barcode_agreement(
             n_points=n_points,
             dimension=dimension,
             random_seed=random_seed,
+            r_max=r_max,
             simplex_count=len(filtration),
             edge_count=len(our_edges),
             reference_backend=backend_name,
             h0_count_ours=None,
             h0_count_reference=None,
             h0_distance=None,
-            h0_distance_metric="bottleneck",
+            h1_count_ours=None,
+            h1_count_reference=None,
+            h1_distance=None,
+            distance_metric="bottleneck",
             h0_count_gudhi=None,
             h0_bottleneck=None,
             max_abs_edge_alpha_diff=None,
@@ -229,15 +281,35 @@ def run_baseline_barcode_agreement(
     ours_tree = backend.simplex_tree_from_filtration(filtration)
     reference_tree = backend.alpha_complex_simplex_tree(centers)
 
-    ours_h0 = backend.persistence_intervals(ours_tree, dimension=0, homology_coeff_field=2)
-    reference_h0 = backend.persistence_intervals(
-        reference_tree,
-        dimension=0,
-        homology_coeff_field=2,
-    )
-    h0_distance = backend.bottleneck_distance(ours_h0, reference_h0)
+    distances: dict[int, float] = {}
+    counts_ours: dict[int, int] = {}
+    counts_reference: dict[int, int] = {}
+    for hom_dim in (0, 1):
+        ours = _truncate_intervals(
+            backend.persistence_intervals(
+                ours_tree, dimension=hom_dim, homology_coeff_field=2
+            ),
+            r_max,
+        )
+        reference = _truncate_intervals(
+            backend.persistence_intervals(
+                reference_tree, dimension=hom_dim, homology_coeff_field=2
+            ),
+            r_max,
+        )
+        distances[hom_dim] = backend.bottleneck_distance(ours, reference)
+        counts_ours[hom_dim] = int(len(ours))
+        counts_reference[hom_dim] = int(len(reference))
 
-    reference_edges = backend.edge_map(reference_tree)
+    # Edge comparison, restricted to edges below r_max on the reference side
+    # (ours cannot contain edges above r_max by construction).  The alpha
+    # complex assigns non-Gabriel Delaunay edges their *inherited* value, so
+    # exact value equality is not implied by the theory; the sound invariant
+    # is one-sided: the Cech value never exceeds the alpha-complex value.
+    # The absolute difference (the inheritance gap) is informational only.
+    reference_edges = {
+        e: v for e, v in backend.edge_map(reference_tree).items() if v <= r_max
+    }
     our_edge_set = set(our_edges)
     ref_edge_set = set(reference_edges)
     common_edges = our_edge_set & ref_edge_set
@@ -247,23 +319,24 @@ def run_baseline_barcode_agreement(
         max_abs_edge_alpha_diff: float | None = max(
             abs(our_edges[e] - reference_edges[e]) for e in common_edges
         )
+        edge_alpha_ok = all(
+            our_edges[e] <= reference_edges[e] + edge_alpha_tol for e in common_edges
+        )
     else:
-        # No common edges: cannot compute alpha difference; report as None
-        # (float("inf") is not strict JSON and is misleading when edge sets are disjoint).
         max_abs_edge_alpha_diff = None
+        edge_alpha_ok = True
 
-    edge_alpha_ok = max_abs_edge_alpha_diff is None or max_abs_edge_alpha_diff <= edge_alpha_tol
     passed = (
-        len(ours_h0) == len(reference_h0)
-        and h0_distance <= bottleneck_tol
+        counts_ours[0] == counts_reference[0]
+        and distances[0] <= bottleneck_tol
+        and distances[1] <= bottleneck_tol
         and edge_alpha_ok
         and missing_edge_count == 0
-        and extra_edge_count == 0
     )
     message = (
-        "H0 barcode agreement passed."
+        "H0/H1 barcode agreement passed."
         if passed
-        else "H0 barcode agreement failed threshold checks."
+        else "H0/H1 barcode agreement failed threshold checks."
     )
 
     return BaselineBarcodeAgreement(
@@ -273,16 +346,22 @@ def run_baseline_barcode_agreement(
         n_points=n_points,
         dimension=dimension,
         random_seed=random_seed,
+        r_max=r_max,
         simplex_count=len(filtration),
         edge_count=len(our_edges),
         reference_backend=backend.name,
-        h0_count_ours=int(len(ours_h0)),
-        h0_count_reference=int(len(reference_h0)),
-        h0_distance=h0_distance,
-        h0_distance_metric="bottleneck",
-        h0_count_gudhi=int(len(reference_h0)),
-        h0_bottleneck=h0_distance,
-        max_abs_edge_alpha_diff=float(max_abs_edge_alpha_diff) if max_abs_edge_alpha_diff is not None else None,
+        h0_count_ours=counts_ours[0],
+        h0_count_reference=counts_reference[0],
+        h0_distance=distances[0],
+        h1_count_ours=counts_ours[1],
+        h1_count_reference=counts_reference[1],
+        h1_distance=distances[1],
+        distance_metric="bottleneck",
+        h0_count_gudhi=counts_reference[0],
+        h0_bottleneck=distances[0],
+        max_abs_edge_alpha_diff=float(max_abs_edge_alpha_diff)
+        if max_abs_edge_alpha_diff is not None
+        else None,
         missing_edge_count=missing_edge_count,
         extra_edge_count=extra_edge_count,
     )
