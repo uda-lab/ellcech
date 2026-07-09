@@ -11,7 +11,10 @@ This package computes filtration values for the *anisotropic alpha complex*:
     α(σ) = min_x  max_{i ∈ σ} f_i(x),   f_i(x) = (x − x̄_i)ᵀ Aᵢ (x − x̄_i)
 
 The mathematical foundations are formalised in Lean 4 in the companion repo
-`paper-ellalpha/` (theorems T1–T9 in `AnisotropicKKT.lean` / `Duality.lean`).
+`paper-ellalpha/`: solver-level facts as theorems T1–T9 in
+`AnisotropicKKT.lean` / `Duality.lean`, and the certified pruning stack as
+letter-named theorems A–G, I in `CechPruning.lean` (see the naming map in
+[docs/certified_pruning_sync.md](docs/certified_pruning_sync.md) §1).
 
 ## Relation to ellphi
 
@@ -129,6 +132,42 @@ filt2 = ea.build_incremental_filtration(A, centers, max_dim=2, predicate_cache=c
 
 Cache keys include simplex, `minimax_kwargs`, `boundary_tol`, and `empty_tol`.
 
+Membership semantics: the default `mode="cech"` admits every P1-trusted
+candidate with its alpha value (theorem A semantics; persistence-correct).
+`mode="critical-only"` restores the historical P1–P3 gating, which keeps only
+critical-simplex candidates and is *not* persistence-correct in general.
+
+## Certified pruning and the act map
+
+`certified_filtration` builds the filtration up to a value bound `r_max`
+without brute-force enumeration, using the Lean-verified pruning theorems
+(B: neighbour graph, C/D: pairwise and face pruning, E: act-interval value
+reuse) and KKT support certificates:
+
+```python
+from ellphi_alpha import certified_filtration, booleanity_report, critical_simplices
+
+result = certified_filtration(matrices, centers, r_max=0.5, max_dim=2)
+print(result.stats)             # candidate counts per pruning stage, solves, reuses
+report = booleanity_report(result.info, max_dim=2)   # act fibers vs Boolean intervals
+crit = critical_simplices(result.info)               # Del^aniso candidates
+```
+
+Acceptance uses the primal upper bound `max_i f_i(c)`; certified rejection
+uses the weak-duality lower bound; ambiguous candidates are retained and
+flagged `uncertain`.  Support certificates re-threshold the solver's active
+set and verify equal-value spread, stationarity, and affine independence,
+escalating to `scipy-slsqp` near degenerate configurations.  See
+[docs/certified_pruning_sync.md](docs/certified_pruning_sync.md) for the
+full specification and the paper-repo naming map.
+
+Talk experiments (degenerate counterexample, pruning efficacy, Booleanity /
+Del^aniso statistics, two-ring toy):
+
+```bash
+poetry run python scripts/run_talk_experiments.py   # -> artifacts/talk/
+```
+
 ## Phase-4 Acceptance Measurements
 
 ```bash
@@ -137,7 +176,8 @@ poetry run python scripts/run_phase4_acceptance.py --output-dir artifacts/phase4
 
 The runner writes:
 
-- `baseline_barcode_agreement.json` (d=2, n=100 check vs GUDHI baseline)
+- `baseline_barcode_agreement.json` (d=2, n=100: H0+H1 bottleneck agreement
+  of the certified filtration vs the GUDHI alpha complex, truncated at r_max)
 - `six_rings_h1_check.json` (6-rings long-lived H1 check)
 - `conditioning_stress_check.json` (cond > 1e6 alpha-error tracking)
 - `phase4_acceptance_summary.json` (combined report)
@@ -166,5 +206,13 @@ Results are saved to `artifacts/experiments/`.
 
 ## Mathematical references
 
-- `paper-ellalpha/LeanEllAlpha/` — Lean 4 formalisations (T1–T9)
+- [docs/certified_pruning_sync.md](docs/certified_pruning_sync.md) — sync
+  with the paper repo: theorem naming map (T1–T9 vs A–G, I), drift findings,
+  and the implementation specification for pruning/act-map/talk experiments
+- `paper-ellalpha/LeanEllAlpha/` — Lean 4 formalisations (solver-level
+  T1–T9; certified pruning A–E, I, G)
+- `paper-ellalpha/anisotropic_cech_pruning_research_plan.md` — certified
+  pruning program
+- `paper-ellalpha/alpha_like_reduction_research_plan.md` — act map /
+  Del^aniso reduction program
 - `paper-ellalpha/next_steps_plan.md` — implementation roadmap (Gap A–F)

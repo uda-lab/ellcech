@@ -1,5 +1,44 @@
 # Development Log
 
+## Session 2026-07-10 — Certified Pruning / Act Map / Talk Experiments (WP1–WP5)
+
+paper repo との同期文書 `docs/certified_pruning_sync.md` §3 の作業パッケージを実装した．
+
+### What was built
+
+- **`pruning.py`（WP1）**: 定理 B（近傍グラフ G_L, L = 2√((r_max+tol)/m)）・
+  C/D（対毎・面 pruning）・E（act 区間の値再利用）・G（clique 列挙）による
+  `certified_filtration`．受理は primal 上界 max_i f_i(c)，certified な棄却は
+  弱双対下界 g(μ)，中間は保持して `uncertain` フラグ（oracle 契約）．
+  `PruningStats` が段階ごとの候補数・solve 数・再利用数を記録．
+  brute force 対照 `brute_force_filtration` と健全性テスト（定理 I 意味論）付き．
+- **`act_map.py`（WP2）**: KKT support 証明書 `certify_support`
+  （support_tol=1e-6 で再閾値処理 → 等値スプレッド・停留残差・勾配のアフィン
+  独立性を検証，不合格時は scipy-slsqp へエスカレーション）．
+  `coface_set`（P3 内部計算の公開），`fiber_partition` / `booleanity_report` /
+  `critical_simplices`（Del^aniso 候補）/ `critical_value_check`．
+  回帰テスト: seed 20260708 の摂動反例で fw+bisect の偽 4 要素 support を
+  証明書が棄却し，エスカレーションで support {0,1,2} に回復することを固定．
+- **膜性の修正（WP3）**: `build_incremental_filtration` に `mode` を追加．
+  既定 `"cech"` は P1 のみで膜性判定（定理 A 意味論・persistence 正）．
+  旧挙動は `"critical-only"`（一般には persistence 非保存）として残置．
+  phase4 baseline を H0+H1 bottleneck（対 GUDHI alpha complex，r_max で切断）
+  に改修：n=100 で H0 1.9e-16，H1 9.8e-11．Delaunay との辺集合一致は
+  情報表示に降格（健全な不変量は片側不等式 Čech 値 ≤ alpha 複体値）．
+- **講演実験（WP4）**: `scripts/run_talk_experiments.py` → `artifacts/talk/`．
+  T1: 退化反例の tie 検出（全単体 support 証明書 `degenerate`，Booleanity
+  違反 1）と摂動 δ∈{1e-2,1e-3} での回復（違反 0，support {0,1,2}）．
+  T2: pruning 効率（n=100, max_dim=2: brute 166,750 候補 → solve 4,572 +
+  再利用 2,762，33 s）．T3: 6 例全てで Booleanity 違反 0・臨界値チェック
+  違反 0，臨界単体は保持複体の 15–40%．T4: 二重リング（essential H1 = 2）．
+
+### Notes
+
+- 全テスト green（`poetry run pytest`）．
+- 既定 `mode="cech"` により，notebook の filtration セルの出力は再実行時に
+  単体数が増える（P2/P3 で落ちていた単体が値付きで入る）．notebook 本文は
+  本ラウンドでは未編集．
+
 ## Session 2026-03-06 — Minimax Solver Numerical Experiment (7 Methods)
 
 ### What changed
