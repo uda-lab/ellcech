@@ -5,7 +5,6 @@ description = "Anisotropic alpha complex for ellipsoid-based topological data an
 authors = [
   { name = "Tomoki Uda", email = "tomoki.uda@gmail.com" }
 ]
-homepage = "https://github.com/uda/ellphi-alpha"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -20,12 +19,14 @@ keywords = [
   "anisotropic",
   "ellipsoid",
 ]
-
 dependencies = [
   "numpy>=1.26",
   "scipy>=1.12",
   "ellphi>=0.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/uda-lab/ellcech"
 
 [tool.poetry]
 packages = [{ include = "ellphi_alpha", from = "src" }]

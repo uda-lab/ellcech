@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Scope
-- Applies only to `ellphi-alpha/`.
+- Applies only to this repo (`uda-lab/ellcech`, package `ellphi_alpha`).
 
 ## Core Policy (Backend-Neutral)
 - Keep core logic backend-neutral.
