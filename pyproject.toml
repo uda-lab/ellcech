@@ -5,7 +5,7 @@ description = "Anisotropic alpha complex for ellipsoid-based topological data an
 authors = [
   { name = "Tomoki Uda", email = "tomoki.uda@gmail.com" }
 ]
-homepage = "https://github.com/uda/ellphi-alpha"
+homepage = "https://github.com/uda-lab/ellcech"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [

@@ -32,7 +32,7 @@ that this package addresses.
 ## Installation (development)
 
 ```bash
-cd ellphi-alpha
+cd ellcech
 poetry install
 ```
 
