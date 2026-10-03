@@ -16,9 +16,9 @@
 - Use small, logical commits.
 
 ## Required Validation Before Handoff
-- `poetry run pytest`
-- `poetry run jupyter nbconvert --to notebook --execute --inplace notebooks/practical_demo.ipynb`
-- `poetry run python scripts/run_phase4_acceptance.py --output-dir artifacts/phase4_acceptance`
+- `uv run pytest`
+- `uv run jupyter nbconvert --to notebook --execute --inplace notebooks/practical_demo.ipynb`
+- `uv run python scripts/run_phase4_acceptance.py --output-dir artifacts/phase4_acceptance`
 
 ## Acceptance Checks
 - A/B checks (`baseline_barcode_agreement`, `six_rings_h1_check`) may be skipped when `gudhi` is unavailable.

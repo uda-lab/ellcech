@@ -33,13 +33,13 @@ that this package addresses.
 
 ```bash
 cd ellcech
-poetry install
+uv sync
 ```
 
 To also install notebook/demo dependencies:
 
 ```bash
-poetry install --with demo
+uv sync --extra demo
 ```
 
 ## Quick start
@@ -91,7 +91,7 @@ print(res.metadata)  # {'fw_iters': 12, 'newton_iters': 3, 'hessian_cond': 42.1,
 ## Running tests
 
 ```bash
-poetry run pytest
+uv run pytest
 ```
 
 ## Notebook demo
@@ -102,7 +102,7 @@ It combines quick numeric checks and visual walkthroughs in one place.
 Execute it in-place to embed fresh outputs:
 
 ```bash
-poetry run jupyter nbconvert --to notebook --execute --inplace notebooks/practical_demo.ipynb
+uv run jupyter nbconvert --to notebook --execute --inplace notebooks/practical_demo.ipynb
 ```
 
 Open [notebooks/practical_demo.ipynb](notebooks/practical_demo.ipynb) to inspect:
@@ -165,13 +165,13 @@ Talk experiments (degenerate counterexample, pruning efficacy, Booleanity /
 Del^aniso statistics, two-ring toy):
 
 ```bash
-poetry run python scripts/run_talk_experiments.py   # -> artifacts/talk/
+uv run python scripts/run_talk_experiments.py   # -> artifacts/talk/
 ```
 
 ## Phase-4 Acceptance Measurements
 
 ```bash
-poetry run python scripts/run_phase4_acceptance.py --output-dir artifacts/phase4_acceptance
+uv run python scripts/run_phase4_acceptance.py --output-dir artifacts/phase4_acceptance
 ```
 
 The runner writes:
@@ -193,13 +193,13 @@ preserve existing behavior.
 
 ```bash
 # Quick benchmark (k=2..6, all methods):
-poetry run python scripts/benchmark_minimax.py
+uv run python scripts/benchmark_minimax.py
 
 # Full numerical experiments (5 experiments):
-poetry run python scripts/run_full_experiment.py --experiments 1 2 3 4 5 --seed 42
+uv run python scripts/run_full_experiment.py --experiments 1 2 3 4 5 --seed 42
 
 # Specific experiment with specific methods:
-poetry run python scripts/run_full_experiment.py --experiments 5 --methods fw+bisect fw+brentq
+uv run python scripts/run_full_experiment.py --experiments 5 --methods fw+bisect fw+brentq
 ```
 
 Results are saved to `artifacts/experiments/`.

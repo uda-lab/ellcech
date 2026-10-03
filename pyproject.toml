@@ -25,36 +25,33 @@ dependencies = [
   "ellphi>=0.1",
 ]
 
+[project.optional-dependencies]
+demo = [
+  "jupyterlab>=4.1",
+  "ipykernel>=6.28",
+  "gudhi>=3.9",
+  "matplotlib>=3.9",
+  "pandas>=2.2.0,<3.0.0",
+  "tqdm>=4.67.1,<5.0.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0,<9.0",
+  "pytest-cov>=7.0.0,<8.0.0",
+  "black[jupyter]>=25.1.0,<26.0.0",
+  "mypy>=1.8,<2.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/uda-lab/ellcech"
-
-[tool.poetry]
-packages = [{ include = "ellphi_alpha", from = "src" }]
-package-mode = true
-
-[tool.poetry.dependencies]
-python = ">=3.10"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.0"
-pytest-cov = "^7.0.0"
-black = { version = "^25.1.0", extras = ["jupyter"] }
-mypy = "^1.8"
-
-[tool.poetry.group.demo]
-optional = true
-
-[tool.poetry.group.demo.dependencies]
-jupyterlab = ">=4.1"
-ipykernel = ">=6.28"
-gudhi = ">=3.9"
-matplotlib = ">=3.9"
-pandas = "^2.2.0"
-tqdm = "^4.67.1"
 
 [tool.mypy]
 mypy_path = "src"
 
 [build-system]
-requires = ["poetry-core>=1.9.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ellphi_alpha"]
