@@ -1,14 +1,19 @@
-# ellphi-alpha
+# ellcech
 
-**Experimental** implementation of the anisotropic alpha complex for ellipsoid-based TDA.
+A Python library for persistent homology of ellipsoids: it computes filtration
+values of the anisotropic (ellipsoid) Čech filtration. The distribution name is
+`ellphi-alpha` and the import name is `ellphi_alpha`.
 
 > Status: Pre-alpha. API and behaviour may change without notice.
 
 ## What this is
 
-This package computes filtration values for the *anisotropic alpha complex*:
+The filtration value of a simplex σ is
 
     α(σ) = min_x  max_{i ∈ σ} f_i(x),   f_i(x) = (x − x̄_i)ᵀ Aᵢ (x − x̄_i)
+
+that is, the smallest level r at which the ellipsoids {f_i ≤ r}, i ∈ σ, share a
+common point.
 
 The mathematical foundations are formalised in Lean 4 in the companion repo
 `paper-ellalpha/`: solver-level facts as theorems T1–T9 in
@@ -19,8 +24,8 @@ letter-named theorems A–G, I in `CechPruning.lean` (see the naming map in
 ## Relation to ellphi
 
 [ellphi](../ellphi/) computes pairwise tangency distances and feeds them into
-Vietoris–Rips filtrations. `ellphi-alpha` computes alpha-complex filtration
-values for simplices of any dimension, giving a sparser (Delaunay-like) complex.
+Vietoris–Rips filtrations. ellcech computes the Čech filtration value α(σ)
+for simplices of any dimension.
 
 **Pairwise case correspondence:**
 
@@ -108,7 +113,7 @@ uv run jupyter nbconvert --to notebook --execute --inplace notebooks/practical_d
 Open [notebooks/practical_demo.ipynb](notebooks/practical_demo.ipynb) to inspect:
 - pairwise `alpha` vs `ellphi.tangency(...).t**2`
 - `|sigma| >= 3` minimax and active set
-- filtration graph snapshot up to an alpha threshold
+- filtration graph snapshot up to a threshold on α
 - optional GUDHI persistence summary (with H1 lifetime plot when available)
 
 ## Backend architecture
@@ -133,7 +138,7 @@ filt2 = ea.build_incremental_filtration(A, centers, max_dim=2, predicate_cache=c
 Cache keys include simplex, `minimax_kwargs`, `boundary_tol`, and `empty_tol`.
 
 Membership semantics: the default `mode="cech"` admits every P1-trusted
-candidate with its alpha value (theorem A semantics; persistence-correct).
+candidate with its α value (theorem A semantics; persistence-correct).
 `mode="critical-only"` restores the historical P1–P3 gating, which keeps only
 critical-simplex candidates and is *not* persistence-correct in general.
 
@@ -177,9 +182,10 @@ uv run python scripts/run_phase4_acceptance.py --output-dir artifacts/phase4_acc
 The runner writes:
 
 - `baseline_barcode_agreement.json` (d=2, n=100: H0+H1 bottleneck agreement
-  of the certified filtration vs the GUDHI alpha complex, truncated at r_max)
+  of the certified filtration on isotropic data vs the Euclidean alpha complex
+  computed by GUDHI as reference, truncated at r_max)
 - `six_rings_h1_check.json` (6-rings long-lived H1 check)
-- `conditioning_stress_check.json` (cond > 1e6 alpha-error tracking)
+- `conditioning_stress_check.json` (cond > 1e6 α-error tracking)
 - `phase4_acceptance_summary.json` (combined report)
 
 If `gudhi` is unavailable, the first two checks are reported as `skipped` while
@@ -203,6 +209,18 @@ uv run python scripts/run_full_experiment.py --experiments 5 --methods fw+bisect
 ```
 
 Results are saved to `artifacts/experiments/`.
+
+## Release history
+
+Version numbers are proposed (uda-lab/ellcech#9) until tagged; dates and
+commits are facts.
+
+| Version | Commit | Date | Contents |
+|---|---|---|---|
+| 0.1.0 | `f265c4a` | 2026-03-07 | First internal solver line (from `dc27cf7`, 2026-03-05): minimax solver, enumeration, predicates, filtration, GUDHI backend, gradient. Not public. |
+| 0.2.0 | `82d13e3` | 2026-07-23 | Certified pruning, act map, Čech membership semantics (commits of 2026-07-10). First public state as uda-lab/ellcech. |
+| 0.3.0 | `ff1941e` | 2026-10-03 | CI, uv migration, gradient docstring, handoff validation (#3, #6, #7, #8). |
+| next | — | — | First tagged public release |
 
 ## Mathematical references
 
