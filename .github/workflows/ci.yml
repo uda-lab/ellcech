@@ -35,3 +35,29 @@ jobs:
 
       - name: Run pytest
         run: uv run --no-sync pytest -q
+
+  handoff-validation:
+    name: Handoff validation (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install package and handoff dependencies
+        run: uv sync --locked --extra demo
+
+      - name: Execute canonical notebook in place
+        run: uv run --no-sync jupyter nbconvert --to notebook --execute --inplace notebooks/practical_demo.ipynb
+
+      - name: Run Phase-4 acceptance checks
+        run: uv run --no-sync python scripts/run_phase4_acceptance.py --output-dir artifacts/phase4_acceptance
