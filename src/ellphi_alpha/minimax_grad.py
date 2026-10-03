@@ -3,8 +3,11 @@
 Mathematical background
 -----------------------
 Given a solved MinimaxResult with optimal weights mu* and circumcenter x*,
-the filtration value alpha(sigma; theta) is differentiable at non-degenerate
-configurations (Theorem 4.1, minimax_solver_analysis.tex §4).
+the filtration value alpha(sigma; theta) is differentiable for alpha > 0
+exactly when the dual optimal set is a singleton (Theorem 4.1,
+minimax_solver_analysis.tex §4).  A unique optimizer may still have zero
+weights; those indices simply have zero gradient blocks.  The alpha = 0 case
+is exceptional.
 
 By the envelope theorem applied to the dual:
 
@@ -86,9 +89,14 @@ def compute_gradient(
         GradientResult with d_xbar and d_A lists (length k each).
 
     Notes:
-        - Valid only at non-degenerate configurations (mu_k* > 0 strictly).
-        - At degenerate points the gradient may not exist; the formula still
-          returns the correct one-sided subgradient when mu_k* = 0 (zero).
+        - For alpha > 0, the gradient exists exactly when the dual optimal
+          set is a singleton; this does not require every mu_k* to be
+          strictly positive.
+        - When the unique optimizer has mu_k* = 0, the corresponding center
+          and matrix gradient blocks are zero, not evidence of
+          non-differentiability.
+        - The alpha = 0 case is exceptional: the value is differentiable with
+          zero gradient even when the dual optimizer is not unique.
         - The formula is exact (no finite differences), O(k d^2) cost.
     """
     centers = np.asarray(centers, dtype=float)
