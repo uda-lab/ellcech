@@ -165,7 +165,7 @@ documented as NOT persistence-correct in general.
 - Tests: pruning soundness vs brute force (WP1), reuse-equals-solve within
   tol (WP2), act-map idempotency on random simplices, tie detection on the
   T1 configuration, baseline acceptance green under WP3.
-- All existing tests must stay green (`poetry run pytest`); the notebook
+- All existing tests must stay green (`uv run pytest`); the notebook
   stays untouched in this round.
 
 ## 4. Non-goals in this round

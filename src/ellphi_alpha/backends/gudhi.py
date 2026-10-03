@@ -16,7 +16,7 @@ __all__ = ["GudhiBackend"]
 
 _MISSING_GUDHI_MESSAGE = (
     "gudhi is not installed. Install it via `pip install gudhi` "
-    "or `poetry install --with demo`."
+    "or `uv sync --extra demo`."
 )
 
 

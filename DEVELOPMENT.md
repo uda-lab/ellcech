@@ -34,7 +34,7 @@ paper repo との同期文書 `docs/certified_pruning_sync.md` §3 の作業パ�
 
 ### Notes
 
-- 全テスト green（`poetry run pytest`）．
+- 全テスト green（`uv run pytest`）．
 - 既定 `mode="cech"` により，notebook の filtration セルの出力は再実行時に
   単体数が増える（P2/P3 で落ちていた単体が値付きで入る）．notebook 本文は
   本ラウンドでは未編集．
@@ -196,7 +196,7 @@ Run date: 2026-03-06 (`scripts/run_phase4_acceptance.py`).
 ### What was built
 
 **Package scaffold** (`pyproject.toml`, `src/ellphi_alpha/`, `tests/`):
-- Poetry project, `ellphi>=0.1` from PyPI, `requires-python = ">=3.10"`
+- uv project, `ellphi>=0.1` from PyPI, `requires-python = ">=3.10"`
 - Matches ellphi's `src/` layout for smooth eventual integration
 
 **Gap A: minimax solver** (`src/ellphi_alpha/minimax.py`):
