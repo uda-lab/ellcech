@@ -6,12 +6,14 @@ authors = [
   { name = "Tomoki Uda", email = "tomoki.uda@gmail.com" }
 ]
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Intended Audience :: Science/Research",
   "Topic :: Scientific/Engineering :: Mathematics",
   "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
 ]
 keywords = [
   "topological data analysis",

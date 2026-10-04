@@ -234,3 +234,9 @@ commits are facts.
 - `paper-ellalpha/alpha_like_reduction_research_plan.md` — act map /
   Del^aniso reduction program
 - `paper-ellalpha/next_steps_plan.md` — implementation roadmap (Gap A–F)
+
+## License
+
+MIT (see [LICENSE](LICENSE)), aligned with EllPHi; the license applies to this
+repository's entire history, including the snapshot
+`82d13e3e174f4903cdcd6adcee1f469348361c91` used by the APCT experiments.
