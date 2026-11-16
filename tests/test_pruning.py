@@ -79,11 +79,11 @@ def test_clique_candidates_matches_brute_force():
 @pytest.mark.parametrize("seed", [1, 2, 3, 4])
 def test_certified_filtration_matches_brute_force(seed):
     # Theorem I soundness semantics: the certified pipeline must emit exactly
-    # the simplices with alpha <= r_max, with matching values.
+    # the simplices with alpha <= t_max, with matching values.
     matrices, centers = _random_instance(10, 2, seed)
-    r_max = _pairwise_alpha_percentile(matrices, centers, 40.0)
-    cert = certified_filtration(matrices, centers, r_max=r_max, max_dim=3)
-    brute = brute_force_filtration(matrices, centers, r_max=r_max, max_dim=3)
+    t_max = _pairwise_alpha_percentile(matrices, centers, 40.0)
+    cert = certified_filtration(matrices, centers, t_max=t_max, max_dim=3)
+    brute = brute_force_filtration(matrices, centers, t_max=t_max, max_dim=3)
 
     cert_map = {e.simplex: e.alpha for e in cert.entries}
     brute_map = {e.simplex: e.alpha for e in brute}
@@ -94,8 +94,8 @@ def test_certified_filtration_matches_brute_force(seed):
 
 def test_certified_filtration_prunes_and_reuses():
     matrices, centers = _random_instance(10, 2, seed=1)
-    r_max = _pairwise_alpha_percentile(matrices, centers, 40.0)
-    result = certified_filtration(matrices, centers, r_max=r_max, max_dim=3)
+    t_max = _pairwise_alpha_percentile(matrices, centers, 40.0)
+    result = certified_filtration(matrices, centers, t_max=t_max, max_dim=3)
     stats = result.stats
     assert stats.emitted == len(result.entries)
     assert stats.solves < stats.brute_force_candidates
@@ -107,8 +107,8 @@ def test_certified_filtration_prunes_and_reuses():
 
 def test_reused_alpha_matches_direct_solve():
     matrices, centers = _random_instance(10, 2, seed=2)
-    r_max = _pairwise_alpha_percentile(matrices, centers, 40.0)
-    result = certified_filtration(matrices, centers, r_max=r_max, max_dim=3)
+    t_max = _pairwise_alpha_percentile(matrices, centers, 40.0)
+    result = certified_filtration(matrices, centers, t_max=t_max, max_dim=3)
     reused = [s for s, i in result.info.items() if i.source == "reused"]
     assert reused
     for simplex in reused:
@@ -119,8 +119,8 @@ def test_reused_alpha_matches_direct_solve():
 
 def test_output_is_downward_closed_and_monotone():
     matrices, centers = _random_instance(10, 2, seed=3)
-    r_max = _pairwise_alpha_percentile(matrices, centers, 40.0)
-    result = certified_filtration(matrices, centers, r_max=r_max, max_dim=3)
+    t_max = _pairwise_alpha_percentile(matrices, centers, 40.0)
+    result = certified_filtration(matrices, centers, t_max=t_max, max_dim=3)
     alpha_map = {e.simplex: e.alpha for e in result.entries}
     for simplex, alpha in alpha_map.items():
         for k in range(len(simplex)):
@@ -133,15 +133,15 @@ def test_output_is_downward_closed_and_monotone():
 
 def test_booleanity_holds_on_generic_data():
     matrices, centers = _random_instance(10, 2, seed=1)
-    r_max = _pairwise_alpha_percentile(matrices, centers, 40.0)
-    result = certified_filtration(matrices, centers, r_max=r_max, max_dim=3)
+    t_max = _pairwise_alpha_percentile(matrices, centers, 40.0)
+    result = certified_filtration(matrices, centers, t_max=t_max, max_dim=3)
     assert all(i.status == "certified" for i in result.info.values())
     report = booleanity_report(result.info, max_dim=3)
     assert report.is_boolean
     assert not report.skipped_fibers
 
 
-def test_r_max_zero_keeps_only_vertices():
+def test_t_max_zero_keeps_only_vertices():
     matrices, centers = _random_instance(5, 2, seed=4)
-    result = certified_filtration(matrices, centers, r_max=0.0, max_dim=2)
+    result = certified_filtration(matrices, centers, t_max=0.0, max_dim=2)
     assert [e.simplex for e in result.entries] == [(v,) for v in range(5)]

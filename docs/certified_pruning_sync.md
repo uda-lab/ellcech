@@ -23,11 +23,11 @@ a second, Lean-verified stack with letter names:
 | Paper name | Statement (informal) | Lean name |
 |---|---|---|
 | A | σ ∈ Čech_r ⟺ α(σ) ≤ r | `cech_birth_value_equiv` |
-| B | m·I ⪯ A_i, α(σ) ≤ r_max ⟹ σ is a clique of G_L, L = 2√(r_max/m) | `distance_pruning_soundness` |
-| C | α({i,j}) > r_max kills every coface | `pairwise_minimax_pruning` |
-| D | α(τ) > r_max, τ ⊆ σ ⟹ α(σ) > r_max | `face_monotonicity_pruning` |
+| B | m·I ⪯ A_i, α(σ) ≤ t_max ⟹ σ is a clique of G_L, L = 2√(t_max/m) | `distance_pruning_soundness` |
+| C | α({i,j}) > t_max kills every coface | `pairwise_minimax_pruning` |
+| D | α(τ) > t_max, τ ⊆ σ ⟹ α(σ) > t_max | `face_monotonicity_pruning` |
 | E | τ ⊆ σ ⊆ C(τ) ⟹ α(σ) = α(τ), where C(τ) = {j : f_j(c_τ) ≤ r_τ} | `active_support_interval_value` |
-| I | certified candidate set retains every true simplex up to r_max | `integrated_candidate_superset_correctness` |
+| I | certified candidate set retains every true simplex up to t_max | `integrated_candidate_superset_correctness` |
 | G | max degree Δ ⟹ ≤ \|V\|·Σ_{t≤k} Δ^t clique candidates | `card_lowSkeletonCliqueFinset_le` |
 | F | d-skeleton determines PH in degrees < d | deferred (citation-level) |
 
@@ -49,7 +49,7 @@ collapses.
 ## 2. Drift findings (survey of this repo, 2026-07-08)
 
 1. **No pruning is implemented.** `enumeration.py` generates all
-   C(n, k+1) subsets; there is no r_max, no Rayleigh bound m, no neighbour
+   C(n, k+1) subsets; there is no t_max, no Rayleigh bound m, no neighbour
    graph G_L, no pairwise or face-value pruning (theorems B, C, D, G unused).
 2. **P3 is used as a filtration-membership condition.** `filtration.py`
    accepts a simplex only if predicates P1–P3 pass. P2 (boundary contact with
@@ -72,8 +72,8 @@ collapses.
 ## 3. Implementation work packages
 
 Conventions for all WPs: pure NumPy/SciPy + existing `solve_minimax`;
-tolerance-aware comparisons everywhere (accept if α ≤ r_max + tol; a certified
-*rejection* requires α > r_max + tol; ambiguous cases are retained, never
+tolerance-aware comparisons everywhere (accept if α ≤ t_max + tol; a certified
+*rejection* requires α > t_max + tol; ambiguous cases are retained, never
 silently pruned — mirror the paper's oracle contract). Follow AGENTS.md
 (backend-neutral core; GUDHI only via the backend).
 
@@ -81,21 +81,21 @@ silently pruned — mirror the paper's oracle contract). Follow AGENTS.md
 
 - `rayleigh_lower_bound(matrices) -> m`: min over sites of λ_min(A_i).
 - `neighbour_graph(centers, L)`: adjacency lists for ‖x̄_i − x̄_j‖ ≤ L with
-  L = 2√(r_max/m).
+  L = 2√(t_max/m).
 - `clique_candidates(adj, max_dim)`: k-clique enumeration from sorted
   adjacency lists (per-vertex combinations of higher-indexed neighbours with
   clique check) — complexity matches theorem G accounting.
-- `certified_filtration(coefs, r_max, max_dim, tol)`: dimension-ordered sweep.
-  Edges of G_L are solved first; edges with α > r_max + tol are removed and
+- `certified_filtration(coefs, t_max, max_dim, tol)`: dimension-ordered sweep.
+  Edges of G_L are solved first; edges with α > t_max + tol are removed and
   higher candidates must be cliques of retained edges (theorem C). A candidate
-  whose recorded facet has α > r_max + tol is skipped (theorem D). Everything
+  whose recorded facet has α > t_max + tol is skipped (theorem D). Everything
   else is solved or value-reused (WP2) and emitted with its α.
 - Return a `PruningStats` record: brute-force count, G_L clique count, counts
   after pairwise and face pruning, number of minimax solves, number of reuse
   assignments, wall time.
 - Soundness test (theorem I semantics): on random instances small enough for
   brute force (n ≤ 12, d = 2, max_dim = 3), the certified pipeline must emit
-  exactly the simplices with α ≤ r_max, with α values matching the brute-force
+  exactly the simplices with α ≤ t_max, with α values matching the brute-force
   pipeline within tolerance.
 
 ### WP2 — `act_map.py`: act map, interval reuse, Del^aniso
@@ -121,7 +121,7 @@ silently pruned — mirror the paper's oracle contract). Follow AGENTS.md
 ### WP3 — Čech-semantics fix for the baseline acceptance
 
 Add a filtration mode in which P1 gates numerical trust but P2/P3 do NOT gate
-membership: every certified candidate with α ≤ r_max enters with its α
+membership: every certified candidate with α ≤ t_max enters with its α
 (theorem A semantics). Reframe `run_baseline_barcode_agreement` to compare
 H0 *and* H1 bottleneck distances against the GUDHI alpha complex on isotropic
 data (persistence-level agreement is the correct acceptance; edge-set equality
@@ -142,17 +142,17 @@ documented as NOT persistence-correct in general.
   origin at level r = 1.
 - **T2 (pruning efficacy).** Random anisotropic clouds, d = 2,
   n ∈ {20, 50, 100}, A_i random SPD with condition number in [1, 10], fixed
-  seeds, max_dim = 2 (optionally 3 for n = 20), r_max = a fixed percentile of
+  seeds, max_dim = 2 (optionally 3 for n = 20), t_max = a fixed percentile of
   pairwise α. Table: brute-force candidate count vs G_L cliques vs after
   pairwise vs after face pruning; solves performed; reuse count; wall time
   (brute-force pipeline timed only for n = 20).
 - **T3 (Booleanity + Del^aniso on toys).** n ∈ {10, 15}, d = 2, several
   seeds, full sweep to max_dim = 3: Booleanity report (violations expected 0),
-  fiber-size histogram, |{α ≤ r_max}| vs |critical|, critical_value_check
+  fiber-size histogram, |{α ≤ t_max}| vs |critical|, critical_value_check
   against GUDHI persistence of the full filtration.
 - **T4 (talk figure).** A two-ring anisotropic toy (rings with tangentially
   aligned anisotropy, n ≈ 40): ellipse field + G_L graph + retained complex
-  at r_max; persistence diagram of the certified filtration with critical
+  at t_max; persistence diagram of the certified filtration with critical
   values marked. Save all figures as PDF+PNG under `artifacts/talk/`.
 - Every experiment: fixed seeds, JSON raw output + CSV summary next to the
   figures (mirroring the existing artifacts/experiments layout).

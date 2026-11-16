@@ -78,11 +78,11 @@ def test_baseline_barcode_agreement_with_fake_backend():
     assert result.h0_distance <= 1e-6
     assert result.h1_distance is not None
     assert result.h1_distance <= 1e-6
-    assert result.r_max > 0.0
+    assert result.t_max > 0.0
     # Backward-compatible alias fields stay populated.
     assert result.h0_bottleneck == result.h0_distance
     assert result.h0_count_gudhi == result.h0_count_reference
-    # Reference (Delaunay) edges below r_max must all be present in ours.
+    # Reference (Delaunay) edges below t_max must all be present in ours.
     assert result.missing_edge_count == 0
 
 
@@ -94,7 +94,7 @@ def test_baseline_barcode_agreement_against_gudhi():
         n_points=100,
         dimension=2,
         random_seed=20260306,
-        r_max_quantile=15.0,
+        t_max_quantile=15.0,
     )
     assert result.status == "ok"
     assert result.passed is True

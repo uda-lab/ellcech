@@ -156,7 +156,7 @@ def run_t1(outdir: Path) -> None:
     report["exact"] = rows
 
     # Unperturbed sweep: ties must be detected, Booleanity must fail.
-    exact_cf = certified_filtration(T1_MATRICES, T1_CENTERS, r_max=1.5, max_dim=3)
+    exact_cf = certified_filtration(T1_MATRICES, T1_CENTERS, t_max=1.5, max_dim=3)
     exact_rep = booleanity_report(exact_cf.info, max_dim=3)
     report["exact_sweep"] = {
         "statuses": _status_counts(exact_cf.info),
@@ -168,7 +168,7 @@ def run_t1(outdir: Path) -> None:
     for delta in (1e-2, 1e-3):
         rng = np.random.default_rng(T1_PERTURB_SEED)
         perturbed = T1_CENTERS + delta * rng.standard_normal(T1_CENTERS.shape)
-        cf = certified_filtration(T1_MATRICES, perturbed, r_max=1.5, max_dim=3)
+        cf = certified_filtration(T1_MATRICES, perturbed, t_max=1.5, max_dim=3)
         rep = booleanity_report(cf.info, max_dim=3)
         full = cf.info.get((0, 1, 2, 3))
         report[f"perturbed_delta_{delta:g}"] = {
@@ -226,14 +226,14 @@ def run_t2(outdir: Path) -> None:
         rng = np.random.default_rng(T2_BASE_SEED + n)
         centers = rng.uniform(-1.0, 1.0, size=(n, 2))
         matrices = np.stack([_random_spd(rng, 2) for _ in range(n)])
-        r_max = _pairwise_alpha_percentile(matrices, centers, T2_QUANTILE)
+        t_max = _pairwise_alpha_percentile(matrices, centers, T2_QUANTILE)
         for max_dim in max_dims:
-            cf = certified_filtration(matrices, centers, r_max=r_max, max_dim=max_dim)
+            cf = certified_filtration(matrices, centers, t_max=t_max, max_dim=max_dim)
             stats = cf.stats
             row = {
                 "n": n,
                 "max_dim": max_dim,
-                "r_max": f"{r_max:.6f}",
+                "t_max": f"{t_max:.6f}",
                 "brute_force": stats.brute_force_candidates,
                 "gl_cliques": stats.gl_clique_candidates,
                 "after_pairwise": stats.after_pairwise_candidates,
@@ -249,7 +249,7 @@ def run_t2(outdir: Path) -> None:
             if n == 20:
                 t0 = time.perf_counter()
                 brute = brute_force_filtration(
-                    matrices, centers, r_max=r_max, max_dim=max_dim
+                    matrices, centers, t_max=t_max, max_dim=max_dim
                 )
                 brute_time = time.perf_counter() - t0
                 row["brute_wall_time_s"] = f"{brute_time:.3f}"
@@ -282,8 +282,8 @@ def run_t3(outdir: Path) -> None:
             rng = np.random.default_rng(seed)
             centers = rng.uniform(-1.0, 1.0, size=(n, 2))
             matrices = np.stack([_random_spd(rng, 2) for _ in range(n)])
-            r_max = _pairwise_alpha_percentile(matrices, centers, T3_QUANTILE)
-            cf = certified_filtration(matrices, centers, r_max=r_max, max_dim=3)
+            t_max = _pairwise_alpha_percentile(matrices, centers, T3_QUANTILE)
+            cf = certified_filtration(matrices, centers, t_max=t_max, max_dim=3)
             rep = booleanity_report(cf.info, max_dim=3)
             crit = critical_simplices(cf.info)
             critical_alphas = {cf.info[s].alpha for s in crit}
@@ -293,7 +293,7 @@ def run_t3(outdir: Path) -> None:
                 {
                     "n": n,
                     "seed": seed,
-                    "r_max": f"{r_max:.6f}",
+                    "t_max": f"{t_max:.6f}",
                     "n_simplices": len(cf.info),
                     "n_fibers": rep.n_fibers,
                     "booleanity_violations": len(rep.violations),
@@ -359,8 +359,8 @@ def run_t4(outdir: Path) -> None:
     print("[talk-t4] two-ring anisotropic toy")
     rng = np.random.default_rng(T4_SEED)
     matrices, centers = _two_rings(20, rng)
-    r_max = _pairwise_alpha_percentile(matrices, centers, 15.0)
-    cf = certified_filtration(matrices, centers, r_max=r_max, max_dim=2)
+    t_max = _pairwise_alpha_percentile(matrices, centers, 15.0)
+    cf = certified_filtration(matrices, centers, t_max=t_max, max_dim=2)
     rep = booleanity_report(cf.info, max_dim=2)
     crit = critical_simplices(cf.info)
     critical_alphas = sorted({cf.info[s].alpha for s in crit})
@@ -374,7 +374,7 @@ def run_t4(outdir: Path) -> None:
     top = np.sort(lifetimes)[::-1][:6]
     report = {
         "n_points": len(centers),
-        "r_max": r_max,
+        "t_max": t_max,
         "stats": cf.stats._asdict(),
         "booleanity_violations": len(rep.violations),
         "statuses": _status_counts(cf.info),
@@ -384,7 +384,7 @@ def run_t4(outdir: Path) -> None:
             "violations": cv.violations,
         },
         "h1_count": int(len(h1)),
-        # The two ring classes are expected to be essential at r_max: born
+        # The two ring classes are expected to be essential at t_max: born
         # when each ring closes, not yet filled by triangles.
         "essential_h1_count": int(len(essential_h1)),
         "essential_h1_births": essential_h1[:, 0] if essential_h1.size else [],
@@ -403,12 +403,12 @@ def run_t4(outdir: Path) -> None:
             seg = centers[list(simplex)]
             ax.plot(seg[:, 0], seg[:, 1], color="tab:blue", lw=0.8, alpha=0.7)
     for i in range(len(centers)):
-        pts = _ellipse_points(matrices[i], centers[i], r_max)
+        pts = _ellipse_points(matrices[i], centers[i], t_max)
         ax.plot(pts[:, 0], pts[:, 1], color="tab:gray", lw=0.5, alpha=0.5)
     ax.plot(centers[:, 0], centers[:, 1], "k.", markersize=4)
     ax.set_aspect("equal")
     ax.set_title(
-        rf"Two anisotropic rings: retained complex at $r_{{\max}}={r_max:.3f}$"
+        rf"Two anisotropic rings: retained complex at $t_{{\max}}={t_max:.3f}$"
         f" ({cf.stats.emitted} simplices, {cf.stats.solves} solves, "
         f"{cf.stats.reuses} reuses)"
     )
@@ -416,7 +416,7 @@ def run_t4(outdir: Path) -> None:
 
     # Persistence diagram with critical values marked.
     fig, ax = plt.subplots(figsize=(4.5, 4.5))
-    finite_max = r_max * 1.05
+    finite_max = t_max * 1.05
     for dim, color, marker in ((0, "tab:orange", "o"), (1, "tab:blue", "s")):
         arr = intervals[dim]
         if not arr.size:
@@ -434,7 +434,7 @@ def run_t4(outdir: Path) -> None:
     ax.set_title("Persistence of the certified filtration")
     ax.legend(fontsize=8, loc="lower right")
     _save_fig(fig, outdir, "t4_persistence")
-    print(f"[talk-t4] r_max={r_max:.4f} simplices={cf.stats.emitted} "
+    print(f"[talk-t4] t_max={t_max:.4f} simplices={cf.stats.emitted} "
           f"violations={len(rep.violations)} critical={len(crit)} "
           f"cv_violations={len(cv.violations)} "
           f"essential_h1={len(essential_h1)} top_finite_h1={[round(v,3) for v in top]}")

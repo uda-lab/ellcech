@@ -144,7 +144,7 @@ critical-simplex candidates and is *not* persistence-correct in general.
 
 ## Certified pruning and the act map
 
-`certified_filtration` builds the filtration up to a value bound `r_max`
+`certified_filtration` builds the filtration up to a filtration-value bound `t_max`
 without brute-force enumeration, using the Lean-verified pruning theorems
 (B: neighbour graph, C/D: pairwise and face pruning, E: act-interval value
 reuse) and KKT support certificates:
@@ -152,7 +152,7 @@ reuse) and KKT support certificates:
 ```python
 from ellphi_alpha import certified_filtration, booleanity_report, critical_simplices
 
-result = certified_filtration(matrices, centers, r_max=0.5, max_dim=2)
+result = certified_filtration(matrices, centers, t_max=0.5, max_dim=2)
 print(result.stats)             # candidate counts per pruning stage, solves, reuses
 report = booleanity_report(result.info, max_dim=2)   # act fibers vs Boolean intervals
 crit = critical_simplices(result.info)               # Del^aniso candidates
@@ -183,7 +183,7 @@ The runner writes:
 
 - `baseline_barcode_agreement.json` (d=2, n=100: H0+H1 bottleneck agreement
   of the certified filtration on isotropic data vs the Euclidean alpha complex
-  computed by GUDHI as reference, truncated at r_max)
+  computed by GUDHI as reference, truncated at t_max)
 - `six_rings_h1_check.json` (6-rings long-lived H1 check)
 - `conditioning_stress_check.json` (cond > 1e6 α-error tracking)
 - `phase4_acceptance_summary.json` (combined report)

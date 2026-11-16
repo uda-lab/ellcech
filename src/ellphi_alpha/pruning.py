@@ -5,11 +5,11 @@ Implements the certified candidate-generation pipeline of
 theorems of the paper repo (``anisotropic_cech_pruning_research_plan.md``):
 
 - theorem B (`distance_pruning_soundness`): every simplex with
-  ``alpha <= r_max`` is a clique of the neighbour graph G_L with
-  ``L = 2 sqrt(r_max / m)``, ``m`` the Rayleigh lower bound.
-- theorem C (`pairwise_minimax_pruning`): an edge with ``alpha > r_max``
+  ``alpha <= t_max`` is a clique of the neighbour graph G_L with
+  ``L = 2 sqrt(t_max / m)``, ``m`` the Rayleigh lower bound.
+- theorem C (`pairwise_minimax_pruning`): an edge with ``alpha > t_max``
   kills every coface.
-- theorem D (`face_monotonicity_pruning`): a face with ``alpha > r_max``
+- theorem D (`face_monotonicity_pruning`): a face with ``alpha > t_max``
   kills every coface.
 - theorem E (`active_support_interval_value`): for a certified act support
   ``tau`` with coface set ``C(tau)``, every ``tau ⊆ sigma ⊆ C(tau)`` has
@@ -59,7 +59,7 @@ class PruningStats(NamedTuple):
 
     n_vertices: int
     dimension: int
-    r_max: float
+    t_max: float
     max_dim: int
     rayleigh_m: float
     radius_L: float
@@ -69,7 +69,7 @@ class PruningStats(NamedTuple):
     evaluated_candidates: int  # survived the face check (theorem D)
     solves: int
     reuses: int  # theorem E value assignments
-    rejected: int  # certified alpha > r_max
+    rejected: int  # certified alpha > t_max
     uncertain: int  # retained without a certified value
     emitted: int
     wall_time_s: float
@@ -167,15 +167,15 @@ def certified_filtration(
     matrices: np.ndarray,
     centers: np.ndarray,
     *,
-    r_max: float,
+    t_max: float,
     max_dim: int,
     value_tol: float = _DEFAULT_VALUE_TOL,
     coface_tol: float = _DEFAULT_COFACE_TOL,
     minimax_kwargs: Mapping[str, object] | None = None,
 ) -> CertifiedFiltration:
-    """Build the anisotropic Cech filtration up to ``r_max`` with pruning.
+    """Build the anisotropic Cech filtration up to ``t_max`` with pruning.
 
-    Emits exactly the simplices with ``alpha(sigma) <= r_max`` (theorem A
+    Emits exactly the simplices with ``alpha(sigma) <= t_max`` (theorem A
     semantics — predicates P2/P3 do *not* gate membership) for
     ``dim <= max_dim``, with their filtration values, using theorems B/C/D
     to prune candidates and theorem E to reuse values across act intervals.
@@ -188,17 +188,17 @@ def certified_filtration(
         raise ValueError("matrices and centers must have the same number of vertices")
     if matrices.shape[1] != matrices.shape[2] or matrices.shape[1] != centers.shape[1]:
         raise ValueError("matrix and center dimensions must agree")
-    if r_max < 0.0:
-        raise ValueError("r_max must be non-negative")
+    if t_max < 0.0:
+        raise ValueError("t_max must be non-negative")
 
     t0 = time.perf_counter()
     n, d = centers.shape
     kwargs = dict(minimax_kwargs or {})
 
     m = rayleigh_lower_bound(matrices)
-    # value_tol under the root keeps boundary simplices (alpha == r_max) in
+    # value_tol under the root keeps boundary simplices (alpha == t_max) in
     # G_L despite sqrt/square rounding.
-    radius = 2.0 * math.sqrt((r_max + value_tol) / m)
+    radius = 2.0 * math.sqrt((t_max + value_tol) / m)
     adjacency = neighbour_graph(centers, radius)
 
     brute_force = sum(math.comb(n, k) for k in range(1, max_dim + 2))
@@ -209,7 +209,7 @@ def certified_filtration(
     alpha_by_simplex: dict[tuple[int, ...], float] = {}
     solves = reuses = rejected = uncertain = 0
 
-    accept_threshold = r_max + value_tol
+    accept_threshold = t_max + value_tol
 
     def solve_and_certify(simplex: tuple[int, ...]) -> tuple[float, float, object]:
         """Return (upper, lower, certificate) for one candidate."""
@@ -340,7 +340,7 @@ def certified_filtration(
     stats = PruningStats(
         n_vertices=n,
         dimension=d,
-        r_max=float(r_max),
+        t_max=float(t_max),
         max_dim=max_dim,
         rayleigh_m=m,
         radius_L=radius,
@@ -362,14 +362,14 @@ def brute_force_filtration(
     matrices: np.ndarray,
     centers: np.ndarray,
     *,
-    r_max: float,
+    t_max: float,
     max_dim: int,
     value_tol: float = _DEFAULT_VALUE_TOL,
     minimax_kwargs: Mapping[str, object] | None = None,
 ) -> list[FiltrationEntry]:
     """Reference pipeline: solve every candidate simplex, no pruning.
 
-    Uses the same acceptance rule (primal upper bound ``<= r_max + tol``) as
+    Uses the same acceptance rule (primal upper bound ``<= t_max + tol``) as
     :func:`certified_filtration`, so the two outputs are directly comparable
     (theorem I soundness semantics).
     """
@@ -380,7 +380,7 @@ def brute_force_filtration(
 
     entries: list[FiltrationEntry] = []
     alpha_by_simplex: dict[tuple[int, ...], float] = {}
-    accept_threshold = r_max + value_tol
+    accept_threshold = t_max + value_tol
 
     from .enumeration import iter_candidate_simplices
 
