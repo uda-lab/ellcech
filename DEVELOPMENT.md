@@ -1,12 +1,21 @@
 # Development Log
 
+## 保存済み実験データのスキーマ
+
+[pruning 効率の CSV](artifacts/talk/t2_pruning_efficacy.csv)、
+[pruning 効率の JSON](artifacts/talk/t2_report.json)、
+[Booleanity 集計の CSV](artifacts/talk/t3_booleanity_summary.csv)、
+[二重リングの JSON](artifacts/talk/t4_report.json) は、記録時のスキーマとデータを保持する．
+現行スクリプトが新たに生成するデータの閾値フィールドは `t_max` であるため、
+保存済みデータと新規出力を併読するツールは各ファイルの列名・キーを確認すること．
+
 ## Session 2026-07-10 — Certified Pruning / Act Map / Talk Experiments (WP1–WP5)
 
 paper repo との同期文書 `docs/certified_pruning_sync.md` §3 の作業パッケージを実装した．
 
 ### What was built
 
-- **`pruning.py`（WP1）**: 定理 B（近傍グラフ G_L, L = 2√((r_max+tol)/m)）・
+- **`pruning.py`（WP1）**: 定理 B（近傍グラフ G_L, L = 2√((t_max+tol)/m)）・
   C/D（対毎・面 pruning）・E（act 区間の値再利用）・G（clique 列挙）による
   `certified_filtration`．受理は primal 上界 max_i f_i(c)，certified な棄却は
   弱双対下界 g(μ)，中間は保持して `uncertain` フラグ（oracle 契約）．
@@ -22,7 +31,7 @@ paper repo との同期文書 `docs/certified_pruning_sync.md` §3 の作業パ�
 - **膜性の修正（WP3）**: `build_incremental_filtration` に `mode` を追加．
   既定 `"cech"` は P1 のみで膜性判定（定理 A 意味論・persistence 正）．
   旧挙動は `"critical-only"`（一般には persistence 非保存）として残置．
-  phase4 baseline を H0+H1 bottleneck（対 GUDHI alpha complex，r_max で切断）
+  phase4 baseline を H0+H1 bottleneck（対 GUDHI alpha complex，t_max で切断）
   に改修：n=100 で H0 1.9e-16，H1 9.8e-11．Delaunay との辺集合一致は
   情報表示に降格（健全な不変量は片側不等式 Čech 値 ≤ alpha 複体値）．
 - **講演実験（WP4）**: `scripts/run_talk_experiments.py` → `artifacts/talk/`．
