@@ -1,5 +1,14 @@
 # Development Log
 
+## 保存済み実験データのスキーマ
+
+[pruning 効率の CSV](artifacts/talk/t2_pruning_efficacy.csv)、
+[pruning 効率の JSON](artifacts/talk/t2_report.json)、
+[Booleanity 集計の CSV](artifacts/talk/t3_booleanity_summary.csv)、
+[二重リングの JSON](artifacts/talk/t4_report.json) は、記録時のスキーマとデータを保持する．
+現行スクリプトが新たに生成するデータの閾値フィールドは `t_max` であるため、
+保存済みデータと新規出力を併読するツールは各ファイルの列名・キーを確認すること．
+
 ## Session 2026-07-10 — Certified Pruning / Act Map / Talk Experiments (WP1–WP5)
 
 paper repo との同期文書 `docs/certified_pruning_sync.md` §3 の作業パッケージを実装した．
