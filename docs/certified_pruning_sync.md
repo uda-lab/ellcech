@@ -22,11 +22,11 @@ a second, Lean-verified stack with letter names:
 
 | Paper name | Statement (informal) | Lean name |
 |---|---|---|
-| A | σ ∈ Čech_r ⟺ α(σ) ≤ r | `cech_birth_value_equiv` |
+| A | σ ∈ Čech_t ⟺ α(σ) ≤ t | `cech_birth_value_equiv` |
 | B | m·I ⪯ A_i, α(σ) ≤ t_max ⟹ σ is a clique of G_L, L = 2√(t_max/m) | `distance_pruning_soundness` |
 | C | α({i,j}) > t_max kills every coface | `pairwise_minimax_pruning` |
 | D | α(τ) > t_max, τ ⊆ σ ⟹ α(σ) > t_max | `face_monotonicity_pruning` |
-| E | τ ⊆ σ ⊆ C(τ) ⟹ α(σ) = α(τ), where C(τ) = {j : f_j(c_τ) ≤ r_τ} | `active_support_interval_value` |
+| E | τ ⊆ σ ⊆ C(τ) ⟹ α(σ) = α(τ), where C(τ) = {j : f_j(c_τ) ≤ t_τ} | `active_support_interval_value` |
 | I | certified candidate set retains every true simplex up to t_max | `integrated_candidate_superset_correctness` |
 | G | max degree Δ ⟹ ≤ \|V\|·Σ_{t≤k} Δ^t clique candidates | `card_lowSkeletonCliqueFinset_le` |
 | F | d-skeleton determines PH in degrees < d | deferred (citation-level) |
@@ -103,9 +103,9 @@ silently pruned — mirror the paper's oracle contract). Follow AGENTS.md
 - `act_support(sigma, result) -> tau`: map `active_set` indices back to vertex
   ids, sorted (canonical representative).
 - `coface_set(tau, result, coefs, tol) -> C(tau)`: all j with
-  f_j(c_τ) ≤ r_τ + tol (reuse/expose the P3 internals instead of discarding).
+  f_j(c_τ) ≤ t_τ + tol (reuse/expose the P3 internals instead of discarding).
 - Interval value reuse inside the WP1 sweep: after solving τ, register
-  (τ, C(τ), r_τ); a later candidate σ with τ ⊆ σ ⊆ C(τ) gets α(σ) = r_τ
+  (τ, C(τ), t_τ); a later candidate σ with τ ⊆ σ ⊆ C(τ) gets α(σ) = t_τ
   without a solve (theorem E). Count reuses.
 - `fiber_partition(filtration_entries)`: group simplices by a(σ);
   `booleanity_report(...)`: for each fiber, check it equals
@@ -139,7 +139,7 @@ documented as NOT persistence-correct in general.
   and on {2,3,4}; then perturb centers by δ ∈ {1e-2, 1e-3} (fixed seed) and
   show unique supports and a Boolean fiber report with no violations.
   Output: a small table + one figure with the four ellipses through the
-  origin at level r = 1.
+  origin at level t = 1.
 - **T2 (pruning efficacy).** Random anisotropic clouds, d = 2,
   n ∈ {20, 50, 100}, A_i random SPD with condition number in [1, 10], fixed
   seeds, max_dim = 2 (optionally 3 for n = 20), t_max = a fixed percentile of

@@ -12,7 +12,7 @@ The filtration value of a simplex σ is
 
     α(σ) = min_x  max_{i ∈ σ} f_i(x),   f_i(x) = (x − x̄_i)ᵀ Aᵢ (x − x̄_i)
 
-that is, the smallest level r at which the ellipsoids {f_i ≤ r}, i ∈ σ, share a
+that is, the smallest level t at which the ellipsoids {f_i ≤ t}, i ∈ σ, share a
 common point.
 
 The mathematical foundations are formalised in Lean 4 in the companion repo

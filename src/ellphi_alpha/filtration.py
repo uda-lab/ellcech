@@ -119,7 +119,7 @@ def build_incremental_filtration(
       in the Euclidean specialization) are dropped instead of receiving
       their inherited value.  Available for comparison experiments only.
 
-    For an ``t_max``-bounded construction with certified pruning and value
+    For a ``t_max``-bounded construction with certified pruning and value
     reuse, use :func:`ellphi_alpha.pruning.certified_filtration` instead.
 
     The builder enforces:
